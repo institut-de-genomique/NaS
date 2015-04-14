@@ -1,0 +1,497 @@
+#!/usr/bin/perl -w
+
+################################################################################
+# *
+# * Copyright Jean-Marc Aury / Institut de Genomique / DSV / CEA
+# *                            <jmaury@genoscope.cns.fr>
+# *           Amin Madoui    / Institut de Genomique / DSV / CEA
+# *                            <amadoui@genoscope.cns.fr>
+# *           Stefan Engelen / Institut de Genomique / DSV / CEA
+# *                            <sengelen@genoscope.cns.fr>
+# *
+# * This software, called NaS is a computer program whose purpose is to
+# * build high-quality synthetic reads by using Illumina and Oxford Nanopore
+# * sequencing technologies
+# *
+# * This software is governed by the CeCILL license under French law and
+# * abiding by the rules of distribution of free software.  You can  use,
+# * modify and/ or redistribute the software under the terms of the CeCILL
+# * license as circulated by CEA, CNRS and INRIA at the following URL
+# * "http://www.cecill.info".
+# *
+# * As a counterpart to the access to the source code and  rights to copy,
+# * modify and redistribute granted by the license, users are provided only
+# * with a limited warranty  and the software's author,  the holder of the
+# * economic rights,  and the successive licensors  have only  limited
+# * liability.
+# *
+# * In this respect, the user's attention is drawn to the risks associated
+# * with loading,  using,  modifying and/or developing or reproducing the
+# * software by the user in light of its specific status of free software,
+# * that may mean  that it is complicated to manipulate,  and  that  also
+# * therefore means  that it is reserved for developers  and  experienced
+# * professionals having in-depth computer knowledge. Users are therefore
+# * encouraged to load and test the software's suitability as regards their
+# * requirements in conditions enabling the security of their systems and/or
+# * data to be ensured and,  more generally, to use and operate it in the
+# * same conditions as regards security.
+# *
+# * The fact that you are presently reading this means that you have had
+# * knowledge of the CeCILL license and that you accept its terms.
+################################################################################
+
+use strict;
+use Getopt::Long;
+
+use Graph;
+use Graph::Directed;
+
+our $PRG_NAME = $0;
+our $BLAT = 'blat';
+our $RUN_ASSEMBLY = 'runAssembly';
+our $LASTDB = 'lastdb';
+our $LASTAL = 'lastal';
+our $MAFCONVERT = 'maf-convert';
+
+
+my ($SILENT, $HELP, $NAME, $MIN_COVERAGE) = (0, 0, "longest_path", 10);
+my ($NEWBLER_DIR, $NANO) = ("", "");
+
+my $result = &GetOptions("newblerdir=s" => \$NEWBLER_DIR,
+			 "nano=s"       => \$NANO,
+			 "silent"       => \$SILENT,
+			 "name=s"       => \$NAME,
+			 "mincov=i"     => \$MIN_COVERAGE,
+                         "h"            => \$HELP,
+                        );
+
+if (!$result) { error(); }
+if($HELP) { usage(); }
+
+my($fh_cgraph, $fh_ccov, $fh_allctg, $fh_readstatus);
+open($fh_cgraph, "<", "$NEWBLER_DIR/454ContigGraph.txt") or die "cannot open < $NEWBLER_DIR/454ContigGraph.txt: $!";
+open($fh_allctg, "<", "$NEWBLER_DIR/454AllContigs.fna") or die "cannot open < $NEWBLER_DIR/454AllContigs.fna: $!";
+
+my $g = Graph::Directed->new();
+my %hcontigs = ();
+my %coverage = ();
+my %ctg_seq = ();
+my %id = ();
+my %name = ();
+my %contig_list = ();
+my %real_name = ();
+
+my $THREE_P_IN = 0; 
+my $THREE_P_OUT = 3; 
+my $FIVE_P_IN = 2; 
+my $FIVE_P_OUT = 1;
+my $beg = 1;
+my $n_vertices = 0;
+my $n_edges = 0; 
+my $n_weight = 0;
+my $n_seq = 0;
+
+########
+#
+warn "Loading sequences ...\n" if !$SILENT;
+my ($current_ctg, $seq, $max_seq_size) = ("", "", 0);
+my $n_ctg = 0;
+while(<$fh_allctg>) {
+    if($_ =~ /^>(\S+)/) {
+	$n_ctg++; 
+	if(defined $current_ctg) {
+	    $ctg_seq{$current_ctg} = $seq;
+	    if($max_seq_size < length($seq)) { $max_seq_size = length($seq); }
+	    $seq = "";
+	}
+	$current_ctg = $1;
+    }
+    else { 
+	chomp($_); 
+	$seq .= $_; 
+    }
+}
+if(defined $current_ctg) {
+    $ctg_seq{$current_ctg} = $seq;
+    if($max_seq_size < length($seq)) { $max_seq_size = length($seq); }
+}
+warn "  $n_ctg sequences loaded (max= $max_seq_size).\n" if !$SILENT;
+if($max_seq_size < 1000) {
+    warn "[Error] No contig larger than 1Kbp (max= $max_seq_size), done.\n";
+    exit 0;
+}
+
+########
+# Load contig graph
+warn "Loading elements ...\n" if !$SILENT;
+while(<$fh_cgraph>) {
+    if($_ =~ /^(\d+)\s+(\S+)\s+(\d+)\s+(\d+\.\d+)$/ && $beg) {
+	my $contig = $2;
+	my $contig_id = ($1-1)*4;
+	$id{$contig}=$1;
+	$name{$1}=$contig;
+	$hcontigs{$contig} = $contig_id;
+	$g->add_edge($contig_id+$THREE_P_IN, $contig_id+$FIVE_P_OUT);
+	$g->set_edge_weight($contig_id+$THREE_P_IN, $contig_id+$FIVE_P_OUT, 0.01);
+	$g->add_edge($contig_id+$FIVE_P_IN, $contig_id+$THREE_P_OUT);
+	$g->set_edge_weight($contig_id+$FIVE_P_IN, $contig_id+$THREE_P_OUT, 0.01);
+	$coverage{$contig}=0;
+	$hcontigs{$contig_id+$THREE_P_IN}=$contig."\@3p";
+	$hcontigs{$contig_id+$FIVE_P_OUT}=$contig."\@5p";
+	$hcontigs{$contig_id+$FIVE_P_IN}=$contig."\@5p";
+	$hcontigs{$contig_id+$THREE_P_OUT}=$contig."\@3p";
+	$real_name{$contig_id+$THREE_P_IN}=$contig;
+	$real_name{$contig_id+$FIVE_P_OUT}=$contig;
+	$real_name{$contig_id+$FIVE_P_IN}=$contig;
+	$real_name{$contig_id+$THREE_P_OUT}=$contig;
+	$n_vertices++;
+	$n_edges+=2;
+    }
+    if($_ =~ /^C\s+(\d+)\s+(\S+)\s+(\d+)\s+(\S+)\s+(\d+)$/) {
+	if($beg) { warn "  $n_vertices vertices loaded.\n" if !$SILENT; }
+	$beg = 0;
+	my ($c1_in, $c1_out) = ($THREE_P_IN, $THREE_P_OUT);
+	my ($c2_in, $c2_out) = ($THREE_P_IN, $THREE_P_OUT);
+	if($2 eq "5'") { ($c1_in, $c1_out) = ($FIVE_P_IN, $FIVE_P_OUT); }
+	if($4 eq "5'") { ($c2_in, $c2_out) = ($FIVE_P_IN, $FIVE_P_OUT); }
+	my $contig_id1 = ($1-1)*4;
+	my $contig_id2 = ($3-1)*4;
+	my ($u1, $v1) = ($contig_id1+$c1_out, $contig_id2+$c2_in);
+	my ($u2, $v2) = ($contig_id2+$c2_out, $contig_id1+$c1_in);
+	$g->add_edge($u1, $v1);
+	$g->set_edge_weight($u1, $v1, 0.01);
+	$g->add_edge($u2, $v2);
+	$g->set_edge_weight($u2, $v2, 0.01);
+	$n_edges+=2;
+    }
+    if($_ =~ /^I\s+(\d+)\s+(\S+)\s*(\S*)$/) {
+	$ctg_seq{$name{$1}}=$2;
+	$n_seq++;
+    }
+    if($_ =~ /^F/) { last; }
+}	    
+warn "  $n_edges edges and $n_seq sequences loaded.\n" if !$SILENT;
+
+open(my $fh_ctg_seq, ">", "$NEWBLER_DIR/AllContigs.fa") or die "cannot open > $NEWBLER_DIR/AllContigs.fa: $!";
+while(my ($k, $v) = each %ctg_seq) {
+    print $fh_ctg_seq ">$k\n";
+    print $fh_ctg_seq "$v\n";
+}   
+
+########
+# Launch last alignment
+my $cmd_idx = "$LASTDB -Q 0 $NEWBLER_DIR/idx_last $NANO";
+system($cmd_idx) == 0 or die "system $cmd_idx failed: $?";
+
+my $cmd_last = "$LASTAL -s 2 -T 0 -Q 0 -a 1 $NEWBLER_DIR/idx_last $NEWBLER_DIR/AllContigs.fa > $NEWBLER_DIR/last_ali";
+system($cmd_last) == 0 or die "system $cmd_last failed: $?";
+
+my $LAST_OUT = "last_ali.tab";
+my $cmd_convert = "$MAFCONVERT tab $NEWBLER_DIR/last_ali > $NEWBLER_DIR/$LAST_OUT";
+system($cmd_convert) == 0 or die "system $cmd_convert failed: $?";
+
+
+my($fh_last);
+open($fh_last, "cat $NEWBLER_DIR/$LAST_OUT | grep -v \\# | sort -k1,1nr |") or die "cannot open < $NEWBLER_DIR/$LAST_OUT: $!";
+
+use Data::Dumper;
+warn "Loading last alignment ...\n" if !$SILENT;
+my @ctgs = ();
+while(<$fh_last>) {
+    if($_ =~ /^#/) { next; }
+    if($_ =~ /^(\d+)\s+(\S+)\s+(\d+)\s+(\d+)\s+(\S+)\s+(\d+)\s+(\S+)\s+(\d+)\s+(\d+)\s+(\S+)\s+(\d+)/) {
+	my %ctg = ();
+	$ctg{'name'}=$7;
+	$ctg{'strand'}=$10;
+	$ctg{'score'}=$1;
+	$ctg{'debNano'}=$3;
+	$ctg{'endNano'}=$3+$4;
+	$ctg{'debCtg'}=$8;
+	$ctg{'endCtg'}=$8+$9;
+	if(correctHit(\%ctg) && !overlapExistingHit(\@ctgs, \%ctg)) {
+	    push(@ctgs, \%ctg);
+	}
+    }
+}
+my @sorted_ctgs = sort { $a->{'debNano'} <=> $b->{'debNano'} } @ctgs;
+@sorted_ctgs = chainHits(\@sorted_ctgs);
+warn Dumper(\@sorted_ctgs);
+addHits(\@sorted_ctgs);
+
+my @s_ctgs = ();
+
+#
+# Keep connected components which contain the best hit
+my @wcc = $g->weakly_connected_components();
+warn "Found ", scalar(@wcc), " connected components..\n";
+
+#foreach my $cc (@wcc) {
+#    foreach(@$cc) {
+#	print $_, "\t", $real_name{$_}, "\n";
+#    }
+#}
+#print Dumper(\@wcc), "\n";
+
+if(@ctgs == 0) {
+    warn "No hit with the MinION read was found...\n";
+    exit 0;
+} else {
+    my $best = $ctgs[0];
+    if(@wcc > 1) {
+	my $g1 = Graph::Directed->new();
+	foreach my $cc (@wcc) {
+	    my $keep = 0;
+	    foreach(@$cc) {
+		if(!defined $real_name{$_}) { warn "undefine $_\n"; }
+		if($real_name{$_} eq $best->{'name'}) { $keep = 1; }
+	    }
+	    if($keep) {
+		warn "   keep the connected component which contains contig ", $best->{'name'},"\n";
+		my $n_edges = 0;
+		foreach my $u (@$cc) {
+		    my @s = $g->successors($u);
+		    foreach my $v (@s) {
+			$g1->add_edge($u, $v);
+			$n_edges++;
+			$g1->set_edge_weight($u, $v, 0.01);
+		    }
+		}
+		my ($n_v, $n_e) = ($g1->vertices(), $g1->edges());
+		warn "   New graph V= $n_v vertices and E= $n_e edges\n";
+	    }
+	}
+	$g = $g1;
+    }
+}
+if($g->vertices() > 1000) { 
+    warn "[Warning] graph is too complex, erase vertices\n";
+    $g = new Graph::Directed->new(); 
+}
+my @hits_list = ();
+foreach my $hit (@sorted_ctgs) {
+    my @vertices = $g->vertices();
+    foreach(@vertices) {
+	if($real_name{$_} eq $hit->{'name'}) {
+	    push(@hits_list, $hit);
+	    last;
+	}
+    }
+}
+@sorted_ctgs = @hits_list;
+	
+#
+# Find best path
+my $s = 0;
+if(@sorted_ctgs>1) { 
+    $s = existPath2($g, \@sorted_ctgs, \%real_name, \@s_ctgs);
+} elsif(@sorted_ctgs==1) {
+    $s = $sorted_ctgs[0]->{'score'};
+    push(@s_ctgs, $sorted_ctgs[0]);
+}
+if($s == 0) {
+     my $best_ali = $ctgs[0];
+     my %h = ();
+     $h{'name'} = $best_ali->{'name'};
+     $h{'strand'} = "+"; 
+     @s_ctgs = ();
+     push(@s_ctgs, \%h);
+     $s = $best_ali->{'score'};
+}
+
+my ($best, $bestscore) = (undef, 0);
+if($s > $bestscore) {
+    $bestscore = $s;
+    $best = \@s_ctgs;
+}
+
+warn "--> keep path with score $bestscore\n";
+warn Dumper($best);
+
+#
+# Create NaS sequence
+my $final_seq="";
+foreach(@$best) {
+    my $ori = $_->{'strand'} eq "-" ? -1 : 1;
+    my $s = $ctg_seq{$_->{'name'}};
+    if(!defined $s) { warn "undefined ". $_->{'name'} . "\n"; }
+    if ($ori<0) { $s = revcomp($s); }
+    $final_seq.=$s;
+}
+
+#
+# Print NaS sequence
+my $ls = length($final_seq);
+if($ls == 0) {
+    warn "[Warning] The NaS read length is 0 !\n";
+    exit 0;
+}
+my $ff = "$NEWBLER_DIR/NaS_hqctg_reads_final.fa"; 
+warn "Print NaS read of $ls bp in fasta format ; create file $ff...\n" if !$SILENT;
+open(my $fho_seq, ">", $ff) or die "cannot open > $ff: $!";
+my $is = 0;
+print $fho_seq ">$NAME\n";
+while ($is <= $ls) {
+    printf $fho_seq "%s\n", substr($final_seq, $is, 60);
+    $is = $is + 60;
+}
+close($fho_seq);
+
+sub chainHits {
+    my($ctgs) = @_;
+    my $p = undef;
+    my @new_ctgs = ();
+    my $merge = 0;
+    foreach(@$ctgs) {
+	$merge = 0;
+	if(defined $p) {
+	    #my $correct_for = $p->{'strand'} eq "+" && $_->{'strand'} eq "+" && $p->{'endCtg'} <= $_->{'debCtg'};
+	    #my $correct_rev = $p->{'strand'} eq "-" && $_->{'strand'} eq "-" && $p->{'debCtg'} <= $_->{'debCtg'};
+	    if($_->{'name'} eq $p->{'name'} && $p->{'endCtg'} <= $_->{'debCtg'}) {
+		$p->{'score'} += $_->{'score'};
+		$p->{'endCtg'} = $_->{'endCtg'};
+		$p->{'endNano'} = $_->{'endNano'};
+		$merge = 1;
+		next;
+	    }
+	    push(@new_ctgs, $p);
+	}
+	$p = $_;
+    }
+    if(!$merge) { push(@new_ctgs, $p); }
+    return @new_ctgs;
+}
+
+sub addHits {
+    my($ctgs) = @_;
+    my $previous = undef;
+    foreach(@$ctgs) {
+	if(defined $previous) {
+	    my $gap = $_->{'debNano'} - $previous->{'endNano'};
+	    if($gap > 25) {
+		warn "gap= $gap from $previous->{'endNano'} to $_->{'debNano'}\n";
+		$_->{'nondirect'} = 1;
+	    } else {
+		$_->{'nondirect'} = 0;
+	    }
+	}
+	$previous = $_;
+    }
+}
+
+sub correctHit {
+    my $ctg = shift;
+    return 1;
+}
+
+sub overlapExistingHit {
+    my ($ctgs, $ctg) = @_;
+    foreach(@$ctgs) {
+	#if($_->{'name'} ne $ctg->{'name'}) { next; }
+	my($first, $second) = ($_, $ctg);
+	if($ctg->{'debNano'} < $_->{'debNano'}) { ($first, $second) = ($ctg, $_); }
+	if($first->{'endNano'} > $second->{'debNano'}) { 
+	    #print "Hit : ", Dumper($_), "\n";
+	    #print "Overlap : ", Dumper($ctg), "\n";
+	    #print "********\n";
+	    return 1;
+	}
+    }
+    return 0;
+}
+
+sub existPath {
+    my($g, $ctgs, $hcontigs) = @_;
+    my @path = ();
+    my $score = 0;
+    foreach(@$ctgs) {
+	my ($c_in, $c_out) = ($FIVE_P_IN, $THREE_P_OUT);
+	if($_->{'strand'} eq "-") { 
+	    ($c_in, $c_out) = ($THREE_P_IN, $FIVE_P_OUT); 
+	}
+	$score += $_->{'score'};
+	push(@path, $hcontigs{$_->{'name'}}+$c_in);
+	push(@path, $hcontigs{$_->{'name'}}+$c_out);
+    }
+    if($g->has_path(@path)) { return $score; }
+    return 0;
+}
+		
+sub existPath2 {
+    my($g, $ctgs, $r_name, $ctgs_new) = @_;
+    warn "Launch APSP\n";
+    my $apsp = $g->APSP_Floyd_Warshall();
+    warn " done.\n";
+    my @path = ();
+    my $score = 0;
+    my ($previous, $previous_name) = (undef, "");;
+    foreach(@$ctgs) {
+	my ($c_in, $c_out) = ($FIVE_P_IN, $THREE_P_OUT);
+	if($_->{'strand'} eq "-") { 
+	    ($c_in, $c_out) = ($THREE_P_IN, $FIVE_P_OUT); 
+	}
+	if(defined $previous && $_->{'nondirect'}) {
+	    my @v = $apsp->path_vertices($previous, $hcontigs{$_->{'name'}}+$c_in);
+	    if(scalar(@v)>0) {
+		warn "Add vertices to go from $previous_name to $_->{'name'}\n";
+		my $first = 1;
+		my %seen = ();
+		pop @v;
+		foreach(@v) {
+		    if($first) { $first = 0; next; }
+		    #warn "$_ ";
+		    push(@path, $_);
+		    if(!$seen{$r_name->{$_}}) { 
+			my %h = ();
+			$h{'name'} = $r_name->{$_};
+			$h{'strand'}="+"; 
+			if($_%4 == 0) { $h{'strand'}="-"; } 
+			push(@$ctgs_new, \%h);
+			$score += 1;
+			$seen{$r_name->{$_}}=1;
+		    }
+		}
+		#warn "\n";
+	    }
+	}
+	$score += $_->{'score'};
+	push(@path, $hcontigs{$_->{'name'}}+$c_in);
+	push(@path, $hcontigs{$_->{'name'}}+$c_out);
+	$previous = $hcontigs{$_->{'name'}}+$c_out;
+	$previous_name = $_->{'name'};
+	push(@$ctgs_new, $_);
+    }
+    if($g->has_path(@path)) { 
+	warn "Find path with score : $score\n";
+	return $score; 
+    }
+    return 0;
+}
+
+
+sub revcomp {
+    my $seq = shift;
+    $seq =~ tr/acgtnACGTN/tgcanTGCAN/;
+    my $r = CORE::reverse $seq;
+    return $r;
+}
+
+sub error {
+    my $msg = shift;
+    if(defined $msg) { warn "$msg\n"; }
+    warn "See $PRG_NAME -h for more details.\n";
+    exit 1;
+}
+
+sub usage {
+    my $usage = "------------------------------------------------------------------------------------
+$PRG_NAME - Untangle complex regions from newbler output
+    -newblerdir   : Newbler output dir
+    -nano         : fasta sequence of the MinION read
+    -silent       : silent mode
+    -name         : name of the ouput sequence
+    -h            : This help
+------------------------------------------------------------------------------------\n";
+#    -mincov       : minimal coverage to unvalidate a NaS read (MINCOV2)
+   warn $usage;
+    exit 1;
+}

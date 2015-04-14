@@ -1,0 +1,36 @@
+#! /bin/sh
+# tbl-to-fasta.awk transforms a tbl file into a fasta file, 60 columns per record
+# usage=gawk -f tbl-to-fasta TBL_FILE 
+
+pg=`basename $0`
+
+usage() {
+    echo USAGE :
+    echo "       $pg  <tbl file: STDIN> "
+    echo "       Program to transform a tbl file into a fasta file (in STDOUT)"
+    echo "       cat file.tbl | TblToFasta > file.fa"
+    exit 1
+}
+while [ $1 ]
+do
+    case $1 in
+      "-h") usage ;;
+      *) if [ "$WIN" = "" ]; then WIN=$1; else FIELD=$1; fi ;;
+    esac 
+    shift
+done
+
+gawk '{
+  sequence=$2
+
+  ls = length(sequence)
+  is = 1
+
+  printf ">%s\n", $1
+
+  while (is <= ls)
+  {
+    printf "%s\n", substr(sequence,is,60)
+    is=is+60
+  }
+}' "$@"
