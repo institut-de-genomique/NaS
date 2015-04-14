@@ -63,7 +63,7 @@ This part describes the different steps required to run NaS
 
 The directory "NaS_example_acineto" provides an example of a NaS run performed on 5 MinION reads from Acinetobacter baylyi ADP1.
 
-Input: 
+### Input
 - MinION reads : NaS_example_acineto/MinION_reads_Acinetobacter_baylyi.fa
 - Illumina reads : NaS_example_acineto/AWK_DOSF_1_?_A5KR6.IND3_clean.10prc.fastq
 
@@ -80,7 +80,7 @@ ACTCAAAGAACAAGAGTTACAGTCTAAAAAAGCTGCGGTTGC...
 
 #################################################
 
-Program: NaS v2.0 : a fast hybrid strategy to generate long and error-free reads
+### Options
 
 	--fq1        : illumina reads (R1) in fastQ format
 	
@@ -102,10 +102,11 @@ Program: NaS v2.0 : a fast hybrid strategy to generate long and error-free reads
 	
 	-h           : help message
 	
-Command to launch:
+### Command to launch
 
 `$(pwd)/NaS_v2/NaS --fq1 NaS_example_acineto/AWK_DOSF_1_1_A5KR6.IND3_clean.10prc.fastq --fq2 NaS_example_acineto/AWK_DOSF_1_2_A5KR6.IND3_clean.10prc.fastq --nano NaS_example_acineto/MinION_reads_Acinetobacter_baylyi.fa --out NaS_example --nb_proc 5`
 
+### Result
 Create output directory : NaS_example
 
 Create fasta file from fastq...
