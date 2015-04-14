@@ -49,7 +49,7 @@ See http://alcovna.genouest.org/compareads/ for details.
 INSTALLATION
 ------------
 
-  1. Clone the NaS GitHub
+  1. Clone the NaS GitHub repository
   3. Modify path to newbler and blat binaries (in NaS script, your PATH variable)
   4. Modify if needed the Perl and sh interpreters that have been set to 
      /usr/bin/perl and /bin/sh
