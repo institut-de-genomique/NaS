@@ -64,8 +64,8 @@ This part describes the different steps required to run NaS
 The directory "NaS_example_acineto" provides an example of a NaS run performed on 5 MinION reads from Acinetobacter baylyi ADP1.
 
 Input: 
-- MinION reads : example/MinION_reads_Acinetobacter_baylyi.fa
-- Illumina reads : example/AWK_DOSF_1_?_A5KR6.IND3_clean.10prc.fastq
+- MinION reads : NaS_example_acineto/MinION_reads_Acinetobacter_baylyi.fa
+- Illumina reads : NaS_example_acineto/AWK_DOSF_1_?_A5KR6.IND3_clean.10prc.fastq
 
 
 Warning : At the moment, we only supported the following fastq format :
@@ -78,19 +78,30 @@ ACTCAAAGAACAAGAGTTACAGTCTAAAAAAGCTGCGGTTGC...
 8ACCGGGGGGGGGGGGGGGGGGFGGGGGGGGGGGGGGGGGGG...
 
 #################################################
-NaS V2:
+
 #################################################
-Program: NaS : a fast hybrid strategy to generate long and error-free reads
+Program: NaS v2.0 : a fast hybrid strategy to generate long and error-free reads
+
 	--fq1        : illumina reads (R1) in fastQ format
+	
 	--fq2        : illumina reads (R2) in fastQ format
+	
 	--nano       : nanopore long reads in fastA format
+	
 	--out        : Output directory, default is NaS_date_pid
+	
 	--covmin1    : minimal coverage during contig filtering step, default is 10
+	
 	--covmin2    : minimal coverage to validate NaS read, default is 10
+	
 	--tile       : tile size parameter of blat, default is 10
+	
 	--step       : step size parameter of blat, default is 5
+	
 	--nb_proc    : Number of parallel task, default is 1
+	
 	-h           : help message
+	
 
 Warning : At the moment, we only supported the following fastq format :
     - The sequence name line have to be a one field line
@@ -103,15 +114,22 @@ ACTCAAAGAACAAGAGTTACAGTCTAAAAAAGCTGCGGTTGC...
 
 Command to launch:
 
-`$(pwd)/bin/NaS --fq1 example/AWK_DOSF_1_1_A5KR6.IND3_clean.10prc.fastq --fq2 example/AWK_DOSF_1_2_A5KR6.IND3_clean.10prc.fastq --nano example/MinION_reads_Acinetobacter_baylyi.fa --out NaS_example --nb_proc 5`
+`$(pwd)/NaS_v2/NaS --fq1 NaS_example_acineto/AWK_DOSF_1_1_A5KR6.IND3_clean.10prc.fastq --fq2 NaS_example_acineto/AWK_DOSF_1_2_A5KR6.IND3_clean.10prc.fastq --nano NaS_example_acineto/MinION_reads_Acinetobacter_baylyi.fa --out NaS_example --nb_proc 5`
 
 Create output directory : NaS_example
+
 Create fasta file from fastq...
+
 Alignement step...
+
 Select reads...
+
 Retrieve similar reads...
+
 Generate statistics...
+
 NbReads=  5  CumulativeSize=  31008  N50size=  7994  minSize=  2512  maxSize=  10464  avgSize=  6201.6  =>  NaS_example/NANO_reads.stats
+
 NbReads=  4  CumulativeSize=  34853  N50size=  9684  minSize=  4265  maxSize=  11949  avgSize=  8713.25  =>  NaS_example/NaS_hqctg_reads.stats
 
 
