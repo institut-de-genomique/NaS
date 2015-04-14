@@ -1,0 +1,114 @@
+#!/bin/sh 
+
+################################################################################
+# *
+# * Copyright Jean-Marc Aury / Institut de Genomique / DSV / CEA
+# *                            <jmaury@genoscope.cns.fr>
+# *           Amin Madoui    / Institut de Genomique / DSV / CEA
+# *                            <amadoui@genoscope.cns.fr>
+# *           Stefan Engelen / Institut de Genomique / DSV / CEA
+# *                            <sengelen@genoscope.cns.fr>
+# *
+# * This software, called NaS is a computer program whose purpose is to
+# * build high-quality synthetic reads by using Illumina and Oxford Nanopore
+# * sequencing technologies
+# *
+# * This software is governed by the CeCILL license under French law and
+# * abiding by the rules of distribution of free software.  You can  use,
+# * modify and/ or redistribute the software under the terms of the CeCILL
+# * license as circulated by CEA, CNRS and INRIA at the following URL
+# * "http://www.cecill.info".
+# *
+# * As a counterpart to the access to the source code and  rights to copy,
+# * modify and redistribute granted by the license, users are provided only
+# * with a limited warranty  and the software's author,  the holder of the
+# * economic rights,  and the successive licensors  have only  limited
+# * liability.
+# *
+# * In this respect, the user's attention is drawn to the risks associated
+# * with loading,  using,  modifying and/or developing or reproducing the
+# * software by the user in light of its specific status of free software,
+# * that may mean  that it is complicated to manipulate,  and  that  also
+# * therefore means  that it is reserved for developers  and  experienced
+# * professionals having in-depth computer knowledge. Users are therefore
+# * encouraged to load and test the software's suitability as regards their
+# * requirements in conditions enabling the security of their systems and/or
+# * data to be ensured and,  more generally, to use and operate it in the
+# * same conditions as regards security.
+# *
+# * The fact that you are presently reading this means that you have had
+# * knowledge of the CeCILL license and that you accept its terms.
+################################################################################
+
+pg=`basename $0`
+
+usage() {
+    echo USAGE :
+    echo "       Generate assembly metrics from a fasta file"
+    echo "         First argument is the fasta file"
+    echo "         Second (and optional) argument is the minimum sequence length to take into account"
+    echo "------------------------------------------------------------------------------------"
+    echo "# extract assembly metrics of scaffolds longer than 2kb"
+    echo "assemblyMetrics 454Scaffolds.fna 2000"
+    echo
+    echo "# extract assembly metrics of all scaffolds"
+    echo "assemblyMetrics 454Scaffolds.fna"
+    echo "------------------------------------------------------------------------------------"
+
+    exit 1
+}
+
+FILE=
+len=0
+
+while [ $1 ]
+do
+	case $1 in
+		"-h") 
+			usage ;;
+		*)
+		if [ "$FILE" = "" ]
+			then FILE=$1
+		elif [ "$len" = 0 ]
+			then len=$1
+	fi
+    esac 
+    shift
+done
+
+if [ "$FILE" = "" ]; then
+    echo "[Error] Need to provide an input file in fasta format";
+    echo "See $pg -h for more details."
+    exit 0;
+fi;
+
+if [ -z $(echo $len | sed -e 's/[0-9]//g') ]; then
+	if [ "$len" != 0 ]; then
+	    echo "Take into account sequences longer than $len bp"
+	fi
+else
+    echo "[Error] the minimum sequence length must be an integer";
+    echo "See $pg -h for more details."
+    exit 0;
+fi;
+
+
+
+fastalength $FILE | awk '{ print $2, $1; }' | awk -v LEN=$len '{ if (LEN == 0 || $2 >= LEN) {print $2;} }' | sort -k1,1nr > /tmp/metrics.$$
+fastacomposition $FILE | awk '{ i=2; while(i<NF) { base=toupper($i); if(base != "A" && base != "C" && base != "T" && base != "G") { base="N"; } nb[base]+=$(i+1); i+=2; }} END { tot=nb["A"]+nb["C"]+nb["G"]+nb["T"]+nb["N"]; GC=nb["C"]+nb["G"]; pourcenN=int((nb["N"]/tot)*10000)/100; pourcenGC=int((GC/(tot-nb["N"]))*10000)/100; print "NumberOfN=", nb["N"], "("pourcenN"%)", "NumberOfGC=", GC, "("pourcenGC"%)"; }' > /tmp/basecompo.$$
+
+size=`cat /tmp/metrics.$$ | awk '{ sum+=$1; } END { print sum; }'`
+nb=`cat /tmp/metrics.$$ | awk '{ nb++; } END { print nb; }'`
+
+echo "#-------------------- GLOBAL STATISTICS -------------------#"
+cat /tmp/metrics.$$ | awk -v SIZE=$size -v NB=$nb 'BEGIN { n50=0; n80=0; n90=0; min=-1; max=-1; } { if(min<0 || min>$1) { min=$1; } if(max<0 || max<$1) { max=$1; } sum+=$1; nb++; if(sum>(SIZE*0.5) && !n50) { print "N50 size=", $1, " number=", nb; n50=1; } if(sum>(SIZE*0.8) && !n80) { print "N80 size=", $1, " number=", nb; n80=1; } if(sum>(SIZE*0.9) && !n90) { print "N90 size=", $1, " number=", nb; n90=1; }} END { print "Assembly size= "SIZE" number= "NB" minSize= "min" maxSize= "max" averageSize= "sum/nb; }'
+echo "#----------------------------------------------------------#"
+
+echo "#-------------------- SIZE REPARTITION --------------------#"
+cat /tmp/metrics.$$ | gawk -v SIZE=$size -v NB=$nb 'BEGIN { split("10000000 5000000 1000000 100000 50000 10000 5000 1500 1000 500 0", size, " "); n=1; sum=0; nb=0; } { OFS="\t"; if($1<size[n]) { if(nb==0) { while($1<size[n]) { n++; }} else { printf("%s %-7d\t%s %-10d (%.2f)\t%s %-15d (%.2f)\n", "Size= >=", size[n], "Number=", nb, (100*nb/NB), "CumulativeSize=", sum, (100*sum/SIZE)); n++; } sum+=$1; nb++; } else { sum+=$1; nb++; }} END {  printf("%s %-7d\t%s %-10d (%.2f)\t%s %-15d (%.2f)\n", "Size= >=", size[n], "Number=", nb, (100*nb/NB), "CumulativeSize=", sum, (100*sum/SIZE)); }'
+echo "#----------------------------------------------------------#"
+
+echo "#-------------------- BASE COMPOSITION --------------------#"
+cat /tmp/basecompo.$$
+echo "#----------------------------------------------------------#"
+

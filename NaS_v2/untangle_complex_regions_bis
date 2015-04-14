@@ -1,0 +1,581 @@
+#!/usr/bin/perl -w
+
+################################################################################
+# *
+# * Copyright Jean-Marc Aury / Institut de Genomique / DSV / CEA
+# *                            <jmaury@genoscope.cns.fr>
+# *           Amin Madoui    / Institut de Genomique / DSV / CEA
+# *                            <amadoui@genoscope.cns.fr>
+# *           Stefan Engelen / Institut de Genomique / DSV / CEA
+# *                            <sengelen@genoscope.cns.fr>
+# *
+# * This software, called NaS is a computer program whose purpose is to
+# * build high-quality synthetic reads by using Illumina and Oxford Nanopore
+# * sequencing technologies
+# *
+# * This software is governed by the CeCILL license under French law and
+# * abiding by the rules of distribution of free software.  You can  use,
+# * modify and/ or redistribute the software under the terms of the CeCILL
+# * license as circulated by CEA, CNRS and INRIA at the following URL
+# * "http://www.cecill.info".
+# *
+# * As a counterpart to the access to the source code and  rights to copy,
+# * modify and redistribute granted by the license, users are provided only
+# * with a limited warranty  and the software's author,  the holder of the
+# * economic rights,  and the successive licensors  have only  limited
+# * liability.
+# *
+# * In this respect, the user's attention is drawn to the risks associated
+# * with loading,  using,  modifying and/or developing or reproducing the
+# * software by the user in light of its specific status of free software,
+# * that may mean  that it is complicated to manipulate,  and  that  also
+# * therefore means  that it is reserved for developers  and  experienced
+# * professionals having in-depth computer knowledge. Users are therefore
+# * encouraged to load and test the software's suitability as regards their
+# * requirements in conditions enabling the security of their systems and/or
+# * data to be ensured and,  more generally, to use and operate it in the
+# * same conditions as regards security.
+# *
+# * The fact that you are presently reading this means that you have had
+# * knowledge of the CeCILL license and that you accept its terms.
+################################################################################
+
+use strict;
+use Getopt::Long;
+
+use Graph;
+use Graph::Directed;
+
+our $PRG_NAME = $0;
+our $BLAT = 'blat';
+our $RUN_ASSEMBLY = 'runAssembly';
+
+my ($SILENT, $HELP, $NAME, $MIN_COVERAGE) = (0, 0, "longest_path", 10);
+my ($NEWBLER_DIR, $CCOV, $ILL_READS, $ILL_SUBSET) = ("", "", "", "");
+
+my $result = &GetOptions("newblerdir=s" => \$NEWBLER_DIR,
+			 "cov=s"        => \$CCOV,
+			 "silent"       => \$SILENT,
+			 "name=s"       => \$NAME,
+			 "ill=s"        => \$ILL_READS,
+			 "illsub=s"     => \$ILL_SUBSET,
+			 "mincov=i"     => \$MIN_COVERAGE,
+                         "h"            => \$HELP,
+                        );
+
+if (!$result) { error(); }
+if($HELP) { usage(); }
+
+my($fh_cgraph, $fh_ccov, $fh_allctg, $fh_readstatus);
+open($fh_ccov, "<", $CCOV) or die "cannot open < $CCOV: $!";
+open($fh_cgraph, "<", "$NEWBLER_DIR/454ContigGraph.txt") or die "cannot open < $NEWBLER_DIR/454ContigGraph.txt: $!";
+open($fh_allctg, "<", "$NEWBLER_DIR/454AllContigs.fna") or die "cannot open < $NEWBLER_DIR/454AllContigs.fna: $!";
+open($fh_readstatus, "<", "$NEWBLER_DIR/454ReadStatus.txt") or die "cannot open < $NEWBLER_DIR/454ReadStatus.txt: $!";
+
+my $g = Graph::Directed->new();
+my %hcontigs = ();
+my %coverage = ();
+my %ctg_seq = ();
+my %id = ();
+my %contig_list = ();
+
+my $THREE_P_IN = 0; 
+my $THREE_P_OUT = 3; 
+my $FIVE_P_IN = 2; 
+my $FIVE_P_OUT = 1;
+my $beg = 1;
+my $n_vertices = 0;
+my $n_edges = 0; 
+my $n_weight = 0;
+my $n_seq = 0;
+
+########
+#
+# HAS TO BE CORRECTED AND TESTED
+# when a edge is created, add a small positive score !! and not a small negative one !
+warn "Loading elements ...\n" if !$SILENT;
+while(<$fh_cgraph>) {
+    if($_ =~ /^(\d+)\s+(\S+)\s+(\d+)\s+(\d+\.\d+)$/ && $beg) {
+	my $contig = $2;
+	my $contig_id = ($1-1)*4;
+	$id{$contig}=$1;
+	$hcontigs{$contig} = $contig_id;
+	$g->add_edge($contig_id+$THREE_P_IN, $contig_id+$FIVE_P_OUT);
+	$g->set_edge_weight($contig_id+$THREE_P_IN, $contig_id+$FIVE_P_OUT, 0.01);
+	$g->add_edge($contig_id+$FIVE_P_IN, $contig_id+$THREE_P_OUT);
+	$g->set_edge_weight($contig_id+$FIVE_P_IN, $contig_id+$THREE_P_OUT, 0.01);
+	$coverage{$contig}=0;
+	$hcontigs{$contig_id+$THREE_P_IN}=$contig."\@3p";
+	$hcontigs{$contig_id+$FIVE_P_OUT}=$contig."\@5p";
+	$hcontigs{$contig_id+$FIVE_P_IN}=$contig."\@5p";
+	$hcontigs{$contig_id+$THREE_P_OUT}=$contig."\@3p";
+	$n_vertices++;
+	$n_edges+=2;
+    }
+    if($_ =~ /^C\s+(\d+)\s+(\S+)\s+(\d+)\s+(\S+)\s+(\d+)$/) {
+	if($beg) { warn "  $n_vertices vertices loaded.\n" if !$SILENT; }
+	$beg = 0;
+	my ($c1_in, $c1_out) = ($THREE_P_IN, $THREE_P_OUT);
+	my ($c2_in, $c2_out) = ($THREE_P_IN, $THREE_P_OUT);
+	if($2 eq "5'") { ($c1_in, $c1_out) = ($FIVE_P_IN, $FIVE_P_OUT); }
+	if($4 eq "5'") { ($c2_in, $c2_out) = ($FIVE_P_IN, $FIVE_P_OUT); }
+	my $contig_id1 = ($1-1)*4;
+	my $contig_id2 = ($3-1)*4;
+	my ($u1, $v1) = ($contig_id1+$c1_out, $contig_id2+$c2_in);
+	my ($u2, $v2) = ($contig_id2+$c2_out, $contig_id1+$c1_in);
+	$g->add_edge($u1, $v1);
+	$g->set_edge_weight($u1, $v1, 0.01);
+	$g->add_edge($u2, $v2);
+	$g->set_edge_weight($u2, $v2, 0.01);
+	$n_edges+=2;
+    }
+    if($_ =~ /^I\s+(\d+)\s+(\S+)\s*(\S*)$/) {
+	$ctg_seq{$1}=$2;
+	$n_seq++;
+    }
+    if($_ =~ /^F/) { last; }
+}	    
+warn "  $n_edges egdes and $n_seq sequences loaded.\n" if !$SILENT;
+
+########
+#
+warn "Loading weight ...\n" if !$SILENT;
+while(<$fh_ccov>) {
+    if($_ =~ /^(\d+)\s+(\S+)\s+(\d+)\s+(\d+\.\d+)$/) {
+	my $contig_id = $hcontigs{$2};
+	my $cov = $4-1;
+	$g->set_edge_weight($contig_id+$THREE_P_IN, $contig_id+$FIVE_P_OUT, -$cov);
+	$g->set_edge_weight($contig_id+$FIVE_P_IN, $contig_id+$THREE_P_OUT, -$cov);
+	$n_weight+=2;
+	$coverage{$2}=$cov;
+    }
+}
+warn "  $n_weight egdes scored.\n" if !$SILENT;
+
+########
+#
+warn "Loading sequences ...\n" if !$SILENT;
+my ($current_ctg, $seq) = ("", "");
+my $n_ctg = 0;
+while(<$fh_allctg>) {
+    if($_ =~ /^>(\S+)/) {
+	$n_ctg++; 
+	if(defined $current_ctg) {
+	    $ctg_seq{$current_ctg} = $seq;
+	    $seq = "";
+	}
+	$current_ctg = $1;
+    }
+    else { 
+	chomp($_); 
+	$seq .= $_; 
+    }
+}
+if(defined $current_ctg) {
+    $ctg_seq{$current_ctg} = $seq;
+}
+warn "  $n_ctg sequences loaded.\n" if !$SILENT;
+
+########
+#
+my %cycle_node = ();
+warn "Launching APSP (Floyd Warshall)...\n" if !$SILENT;
+my $nb_cyc = 0;
+while($g->has_a_cycle() && $nb_cyc < 10) { 
+    $nb_cyc++;
+    warn "Graph has cycle, delete edges !!\n" ;
+    my @v = $g->find_a_cycle();
+    my $prec;
+    foreach(@v) {
+	if(defined $prec) {
+	    $hcontigs{$prec} =~ /^(\S+)\@(\S+)$/;
+	    my ($ctg1, $s1) = ($1, $2);
+	    $hcontigs{$_} =~ /^(\S+)\@(\S+)$/;
+	    my ($ctg2, $s2) = ($1, $2);
+	    if($ctg1 ne $ctg2) { $g->delete_edge($prec, $_); }
+	    $cycle_node{$ctg1}=1;
+	    $cycle_node{$ctg2}=1;
+	}
+	$prec = $_;
+    }
+}
+if($g->has_a_cycle()) { warn "** Graph has too much cycle!! **\n" ; exit 0; }
+
+
+my $apsp = $g->APSP_Floyd_Warshall();
+
+my @V = $g->vertices();
+my @sources = ();
+my @sink = ();
+foreach(@V) {
+    if($g->in_degree($_)==0) { push(@sources, $_); }
+    if($g->out_degree($_)==0) { push(@sink, $_); }
+}
+
+my ($best_src, $best_dest, $best) = (-1, -1, 100000000);
+foreach my $src (@sources) {
+    foreach my $dest (@sink) {
+	my $len = $apsp->path_length($src, $dest) || 0;
+	warn "src= $src ; dest= $dest ; len= $len\n";
+	if(defined $len && $len < $best && validPath($apsp, $src, $dest, \%hcontigs)) {
+	    $best_src = $src;
+	    $best_dest = $dest;
+	    $best = $len;
+	}
+    }
+}
+
+########
+#
+warn "Get best path : $best_src -> $best_dest ; S= $best ...\n" if !$SILENT;
+if($best_src == -1 || $best_dest == -1) {
+    warn "best path not found !\n";
+    exit 0;
+}
+my @lp = $apsp->path_vertices($best_src, $best_dest);
+warn "  path with ", scalar(@lp), " vertices found.\n";
+warn "  remove contigs with no coverage at both extremities...\n";
+my $Npath = removeLR(\@lp, \%hcontigs, \%coverage);
+warn "  path with ", scalar(@$Npath), " vertices found.\n";
+warn "  remove contigs found after a cycle...\n";
+my $N2path = removeEndCycle($Npath, \%hcontigs, \%ctg_seq, \%id, \%cycle_node);
+warn "  path with ", scalar(@$N2path), " vertices found.\n";
+my $u;
+my $final_seq="";
+warn "Final path is :\n";
+foreach(@$N2path) {
+    if(defined $u) {
+	$hcontigs{$u} =~ /^(\S+)\@(\S+)$/;
+	my ($c1, $s1) = ($1, $2);
+	$hcontigs{$_} =~ /^(\S+)\@(\S+)$/;
+	my ($c2, $s2) = ($1, $2);
+	if($c1 eq $c2) {
+	    my $ori = ($s1 eq "3p") ? -1 : 1;
+	    my $s = $ctg_seq{$c1};
+	    if(!defined $s) {
+		$s = $ctg_seq{$id{$c1}};
+	    }
+	    if(!defined $s) { warn "undefined $c1 or ", $id{$c1}, "\n"; }
+	    if ($ori<0) { $s = revcomp($s); }
+	    $final_seq.=$s;
+	    warn $c1, " ", $ori, "\n" if !$SILENT;
+	    $contig_list{$c1}=1
+	}
+    }
+    $u = $_;
+}
+
+# If best_path is shorter than previous contig, so keep the longest contig
+my $ls = length($final_seq);
+my $oldls = $ls;
+my ($swap, $name) = (0, "");
+foreach(keys %ctg_seq) {
+    my $ls2 = length($ctg_seq{$_});
+    if($ls2 > $ls) {
+	$final_seq = $ctg_seq{$_};
+	$ls = $ls2;
+	$swap = 1;
+	$name = $_;
+    }
+}
+warn "Change best path ($oldls bp) to $name ($ls bp) ...\n" if !$SILENT && $swap;
+
+
+my $ff = "$NEWBLER_DIR/best_path.fa"; 
+warn "Print sequence in fasta format ; create file $ff...\n" if !$SILENT;
+open(my $fho_seq, ">", $ff) or die "cannot open > $ff: $!";
+my $is = 0;
+print $fho_seq ">$NAME\n";
+while ($is <= $ls) {
+    printf $fho_seq "%s\n", substr($final_seq, $is, 60);
+    $is = $is + 60;
+}
+close($fho_seq);
+
+########
+#
+#my $f = "$NEWBLER_DIR/454ReadStatus.readlist"; 
+my %keepRead = ();
+#warn "Extract reads belonging to best path ; create file $f...\n";
+#open(my $fho_rs, ">", $f) or die "cannot open > $f: $!";
+#while(<$fh_readstatus>) {
+#    if($_ =~ /^(\S+)\s+(\S+)\s+(\S+)\s+(\d+)\s+(\S)\s+(\S+)\s+(\d+)\s+(\S)$/) {
+#	if(defined $contig_list{$3} && defined $contig_list{$6}) {
+#	    $1 =~ /^(\S+)\/\d$/;
+#	    print $fho_rs $1, "\n";
+#	    $keepRead{"@".$1."/1"}=1;
+#	    $keepRead{"@".$1."/2"}=1;
+#	}
+#    }
+#}
+#close ($fho_rs);
+
+########
+#
+warn "Validate created sequence...\n" if !$SILENT;
+my $psl = "$NEWBLER_DIR/best_path_VS_reads.psl";
+my $cmd_blat = "$BLAT -noHead -tileSize=12 $ff $ILL_READS $psl > $psl.blat_stdout";
+system($cmd_blat) == 0 or die "system $cmd_blat failed: $?";
+open(my $fh_psl, "<", $psl) or die "cannot open < $psl: $!";
+my @seq_coverage = ();
+my ($path_len, $readsize, $nbreads, $sum) = (0, 0, 0);
+while(<$fh_psl>) {
+    my @fields = split;
+    my($deb_ali, $fin_ali, $len, $match, $Qgap, $Tgap) = ($fields[11], $fields[12], $fields[10], $fields[0], $fields[4], $fields[6]);
+    if($Qgap == 0 && $ Tgap == 0 && $fin_ali-$deb_ali == $len && $len == $match) {
+	my($debT, $finT) = ($fields[15], $fields[16]);
+	$path_len = $fields[14];
+	$nbreads++;
+	$sum += $len;
+	my $i = $debT;
+	while($i<=$finT) {
+	    $seq_coverage[$i]++;
+	    $i++;
+	}
+    }
+}
+
+# Try to keep the longest region without drop of coverage under MIN_COVERAGE
+close($fh_psl);
+$readsize = int($sum/$nbreads);
+my ($i, $best_start, $best_end, $best_len, $valid) = (2*$readsize, 0, 2*$readsize, 0, 0);
+my ($low_cov, $current_start, $current_end, $current_len) = (1, 1, 2*$readsize, 0);
+my $fcov = "$NEWBLER_DIR/best_path_VS_reads.cov";
+open(my $fh_cov, ">", $fcov) or die "cannot open > $fcov: $!";
+while($i <= ($path_len - 2*$readsize)) {
+    if(!defined $seq_coverage[$i]) { $seq_coverage[$i]=0; }
+    print $fh_cov "$i ", $seq_coverage[$i], "\n";
+    if($seq_coverage[$i] < $MIN_COVERAGE) {
+	if($current_len > $best_len) {
+	    $best_len = $current_len;
+	    $best_start = $current_start;
+	    $best_end = $current_end;
+	    $low_cov = 1;
+	}
+	$valid = 0;
+    } else {
+	if($low_cov) { 
+	    if($i > 2*$readsize) {  $current_start = $i; }
+	    $current_end = $i;
+	    $current_len = $current_end - $current_start + 1;
+	    $low_cov = 0;
+	}
+	$current_end = $i;
+	$current_len = $current_end - $current_start + 1;
+    }
+    $i++;
+}
+if(!$valid) {
+    $current_end = $path_len;
+    $current_len = $current_end - $current_start + 1;
+    if($current_len > $best_len) {
+	$best_len = $current_len;
+	$best_start = $current_start;
+	$best_end = $current_end;
+    }
+    #if($best_start == 2*$readsize) { $best_start = 1; }
+    #if($best_end == ($path_len - 2*$readsize)) { $best_end = $path_len; }
+    $ls = $best_len;
+    warn "Extract best path from $best_start to $best_end (len= $best_len bp).\n";
+    my $ff = "$NEWBLER_DIR/best_path.fa"; 
+    warn "Print sequence in fasta format ; create file $ff...\n" if !$SILENT;
+    open(my $fho_seq, ">", $ff) or die "cannot open > $ff: $!";
+    my $is = 0;
+    print $fho_seq ">$NAME\n";
+    my $fseq = substr($final_seq, $best_start, $best_len);
+    while ($is <= $ls) {
+	printf $fho_seq "%s\n", substr($fseq, $is, 60);
+	$is = $is + 60;
+    }
+    close($fho_seq);
+    $valid = 1;
+}
+
+#close($fh_psl);
+#$readsize = int($sum/$nbreads);
+#my ($i, $valid) = (2*$readsize, 1);
+#my $fcov = "$NEWBLER_DIR/best_path_VS_reads.cov";
+#open(my $fh_cov, ">", $fcov) or die "cannot open > $fcov: $!";
+#while($i <= ($path_len - 2*$readsize)) {
+#    if(!defined $seq_coverage[$i]) { $seq_coverage[$i]=0; }
+#    if($seq_coverage[$i] < $MIN_COVERAGE) { $valid = 0; }
+#    print $fh_cov "$i ", $seq_coverage[$i], "\n";
+#    $i++;
+#}
+if($valid) { 
+    warn "  --> best path ($ls bp) is validated by read coverage.\n" if !$SILENT;
+    system("mv $NEWBLER_DIR/best_path.fa $NEWBLER_DIR/NaS_hqctg_reads_final.fa") == 0 or die "cp of fasta file failed: $?";
+    warn "  --> Final HQ read is in NaS_hqctg_reads_final.fa.\n" if !$SILENT;
+    exit 0;
+}
+else { 
+    warn "  --> best path is NOT validated by read coverage.\n" if !$SILENT;
+}
+close($fh_cov);
+
+########
+#
+warn "Extract reads from 454ReadStatus.readlist and launch a new assembly...\n" if !$SILENT;
+open(FQ, "cat $ILL_SUBSET | paste - - - - |");
+my $fq = "$NEWBLER_DIR/Readset_from_good_contigs.fastq";
+open(my $fh_fq, ">", $fq) or die "cannot open > $fq: $!";
+my $nb_fq_reads=0;
+while(<FQ>) {
+    my @seq = split;
+    #print $seq[0], "\n";
+    if(defined $keepRead{$seq[0]} && $keepRead{$seq[0]} == 1) {
+	print $fh_fq $seq[0], "\n";
+	print $fh_fq $seq[1], "\n";
+	print $fh_fq $seq[2], "\n";
+	print $fh_fq $seq[3], "\n";
+	$nb_fq_reads++;
+    }
+}
+close($fh_fq);
+warn "  extract $nb_fq_reads reads\n" if !$SILENT;
+
+warn "  run assembly...\n" if !$SILENT;
+my $cmd_runA = "$RUN_ASSEMBLY -urt -noace -mi 99 -o $NEWBLER_DIR/assembly_filter $fq >$NEWBLER_DIR/runassembly_filter_stdout 2>$NEWBLER_DIR/runassembly_filter_stderr";
+system($cmd_runA) == 0 or die "system $cmd_runA failed: $?";
+
+########
+#
+warn "  loading sequences ...\n" if !$SILENT;
+my($fileCTG, $cur_ctg, $s, $final_s, $long, $namectg) = ("$NEWBLER_DIR/assembly_filter/454LargeContigs.fna", "", "", "", 0, "");
+open(my $fh_ctgs, "<", $fileCTG) or die "cannot open < $fileCTG: $!";
+while(<$fh_ctgs>) {
+    if($_ =~ /^>(\S+)/) {
+	if(defined $cur_ctg) {
+	    if(length($s) > $long) { $final_s=$s; $namectg=$cur_ctg; $long=length($s); }
+	    $s = "";
+	}
+	$cur_ctg = $1; 
+    }
+    else { 
+	chomp($_); 
+	$s .= $_; 
+    }
+}
+if(defined $cur_ctg) {
+    if(length($s) > $long) { $final_s = $s; $namectg=$cur_ctg; $long=length($s); }
+}
+warn "  select contig $namectg : $long bp.\n" if !$SILENT;
+my $ffile = "$NEWBLER_DIR/NaS_hqctg_reads_final.fa"; 
+warn "Print sequence in fasta format ; create file $ffile...\n" if !$SILENT;
+open(my $fho_hq, ">", $ffile) or die "cannot open > $ffile: $!";
+my $lseq = length($final_s);
+my $iseq = 0;
+print $fho_hq ">$NAME\n";
+while ($iseq <= $lseq) {
+    printf $fho_hq "%s\n", substr($final_s, $iseq, 60);
+    $iseq = $iseq + 60;
+}
+close($fho_hq);
+warn "  --> Final HQ read is in NaS_hqctg_reads_final.fa.\n" if !$SILENT;
+
+# Remove contigs with no coverage at both extremities
+sub removeLR {
+    my($path, $contigname, $coverage) = @_;
+    my $seenCovered = 0;
+    my @newpath = ();
+    foreach(@$path) {
+	$contigname->{$_} =~ /^(\S+)\@(\S+)$/;
+	my ($ctg, $s) = ($1, $2);
+	if($coverage->{$ctg} != 0 || $seenCovered) { $seenCovered = 1; push(@newpath, $_); }
+    }
+    $seenCovered = 0;
+    my @finalpath = ();
+    foreach(reverse @newpath) {
+	$contigname->{$_} =~ /^(\S+)\@(\S+)$/;
+	my ($ctg, $s) = ($1, $2);
+	if($coverage->{$ctg} != 0 || $seenCovered) { $seenCovered = 1; push(@finalpath, $_); }
+    }
+    my @reverse = reverse(@finalpath);
+    return \@reverse;
+}
+
+# Remove contigs found after a cycle
+sub removeEndCycle {
+    my ($path, $contigname, $sequence, $id, $cycle_node) = @_;
+    my ($lenfwd, $lenrev) = (0, 0);
+    my (@finalfwd, @finalrev) = ((), ());
+    my %vu = ();
+    foreach(@$path) {
+	$contigname->{$_} =~ /^(\S+)\@(\S+)$/;
+	my ($ctg, $s) = ($1, $2);
+	push(@finalfwd, $_);
+	$vu{$ctg}++;
+	if($vu{$ctg}<=1) { 
+	    my $s = (defined $sequence->{$ctg}) ? $sequence->{$ctg} : $sequence->{$id->{$ctg}};
+	    $lenfwd+=length($s);
+	}
+	if(defined $cycle_node->{$ctg} && $cycle_node->{$ctg}==1) {
+	    last; 
+	}
+    }
+    %vu = ();
+    foreach(reverse @$path) {
+	$contigname->{$_} =~ /^(\S+)\@(\S+)$/;
+	my ($ctg, $s) = ($1, $2);
+	push(@finalrev, $_);
+	$vu{$ctg}++;
+	if($vu{$ctg}<=1) { 
+	    my $s = (defined $sequence->{$ctg}) ? $sequence->{$ctg} : $sequence->{$id->{$ctg}};
+	    $lenrev+=length($s); 
+	}
+	if(defined $cycle_node->{$ctg} && $cycle_node->{$ctg}==1) {
+	    last;
+	}
+    }
+    if($lenfwd>=$lenrev) { return \@finalfwd; }
+    else { return \@finalrev; }
+}
+
+
+# Path is not valid, if we used a contig more than once
+sub validPath {
+    my ($apsp, $src, $dest, $hcontigs) = @_;
+    my @lp = $apsp->path_vertices($src, $dest);
+    my %seen = ();
+    #my @path;
+    foreach(@lp) {
+	$hcontigs{$_} =~ /^(\S+)\@(\S+)$/;
+	my ($c1, $s1) = ($1, $2);
+	#warn "$hcontigs{$_}\n";
+	if(defined $seen{$hcontigs{$_}} && $seen{$hcontigs{$_}}==1) { return 0; } #\@path; }
+	#warn "$c1 $s1\n";
+	#push(@path, $_);
+	$seen{$hcontigs{$_}}=1;
+    }
+    return 1; #\@lp;
+}
+
+sub revcomp {
+    my $seq = shift;
+    $seq =~ tr/acgtnACGTN/tgcanTGCAN/;
+    my $r = CORE::reverse $seq;
+    return $r;
+}
+
+sub error {
+    my $msg = shift;
+    if(defined $msg) { warn "$msg\n"; }
+    warn "See $PRG_NAME -h for more details.\n";
+    exit 1;
+}
+
+sub usage {
+    my $usage = "------------------------------------------------------------------------------------
+$PRG_NAME - Untangle complex regions from newbler output
+    -newblerdir   : Newbler output dir
+    -cov          : expected coverage
+    -silent       : silent mode
+    -name         : name of the ouput sequence
+    -ill          : illumina reads (fasta format)
+    -illsub       : subset of illumina reads (seed-reads and recruited-reads)
+    -mincov       : minimal coverage to unvalidate a NaS read (MINCOV2)
+    -h            : This help
+------------------------------------------------------------------------------------\n";
+   warn $usage;
+    exit 1;
+}

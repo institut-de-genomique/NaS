@@ -1,0 +1,29 @@
+#! /bin/sh
+
+pg=`basename $0`
+
+usage() {
+    echo USAGE :
+    echo "       $pg  <fasta file: STDIN> "
+    echo "       Program to transform a fasta file in tabular file :  2col=nameseq seq (in STDOUT)"
+    echo "       cat file.fa | FastaToTbl > file.tbl"
+    exit 1
+}
+while [ $1 ]
+do
+    case $1 in
+      "-h") usage ;;
+      *) if [ "$WIN" = "" ]; then WIN=$1; else FIELD=$1; fi ;;
+    esac 
+    shift
+done
+
+gawk '{
+        if (substr($1,1,1)==">")
+		if (NR>1)
+                	printf "\n%s ", substr($1,2,length($1)-1)
+		else 
+			printf "%s ", substr($1,2,length($1)-1)
+        else 
+                printf "%s", $0
+}END{printf "\n"}'  "$@"
