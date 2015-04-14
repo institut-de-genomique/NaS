@@ -49,14 +49,14 @@ See http://alcovna.genouest.org/compareads/ for details.
 INSTALLATION
 ------------
 
-  1. Clone the NaS GitHub repository
-  3. Modify path to newbler and blat binaries (in NaS script, your PATH variable)
-  4. Modify if needed the Perl and sh interpreters that have been set to 
+  1. Clone this GitHub repository
+  2. Modify path to newbler and blat binaries (in NaS script, your PATH variable)
+  3. Modify if needed the Perl and sh interpreters that have been set to 
      /usr/bin/perl and /bin/sh
-  5. To test the program download this example dataset
+  4. To test the program download this example dataset
 	$$ wget http://www.genoscope.cns.fr/nas/datasets/NaS_example_acineto.tar.gz
-    Untar/unzip the archive
-    $$ tar -zxvf NaS_example_acineto.tar.gz
+     Untar/unzip the archive
+        $$ tar -zxvf NaS_example_acineto.tar.gz
 
 RUNNING NaS
 --------------
