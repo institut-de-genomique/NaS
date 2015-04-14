@@ -80,8 +80,7 @@ ACTCAAAGAACAAGAGTTACAGTCTAAAAAAGCTGCGGTTGC...
 #################################################
 NaS V2:
 #################################################
-Program: NaS
-NaS (v2.0): a fast hybrid strategy to generate long and error-free reads
+Program: NaS : a fast hybrid strategy to generate long and error-free reads
 	--fq1        : illumina reads (R1) in fastQ format
 	--fq2        : illumina reads (R2) in fastQ format
 	--nano       : nanopore long reads in fastA format
