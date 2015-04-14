@@ -51,12 +51,11 @@ INSTALLATION
 
   1. Clone this GitHub repository
   2. Modify path to newbler and blat binaries (in NaS script, your PATH variable)
-  3. Modify if needed the Perl and sh interpreters that have been set to 
-     /usr/bin/perl and /bin/sh
-  4. To test the program download this example dataset
-	$$ wget http://www.genoscope.cns.fr/nas/datasets/NaS_example_acineto.tar.gz
-     Untar/unzip the archive
-        $$ tar -zxvf NaS_example_acineto.tar.gz
+  3. Modify if needed the Perl and sh interpreters that have been set to : /usr/bin/perl and /bin/sh
+  4. To test the program download this example dataset       
+  `wget http://www.genoscope.cns.fr/nas/datasets/NaS_example_acineto.tar.gz`
+  5. Untar/unzip the archive :        
+  `tar -zxvf NaS_example_acineto.tar.gz`
 
 RUNNING NaS
 --------------
@@ -105,7 +104,7 @@ ACTCAAAGAACAAGAGTTACAGTCTAAAAAAGCTGCGGTTGC...
 
 Command to launch:
 
-$ `pwd`/bin/NaS --fq1 example/AWK_DOSF_1_1_A5KR6.IND3_clean.10prc.fastq --fq2 example/AWK_DOSF_1_2_A5KR6.IND3_clean.10prc.fastq --nano example/MinION_reads_Acinetobacter_baylyi.fa --out NaS_example --nb_proc 5
+`$ ``pwd``/bin/NaS --fq1 example/AWK_DOSF_1_1_A5KR6.IND3_clean.10prc.fastq --fq2 example/AWK_DOSF_1_2_A5KR6.IND3_clean.10prc.fastq --nano example/MinION_reads_Acinetobacter_baylyi.fa --out NaS_example --nb_proc 5`
 Create output directory : NaS_example
 Create fasta file from fastq...
 Alignement step...
