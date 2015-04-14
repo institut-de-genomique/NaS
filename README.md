@@ -67,7 +67,6 @@ Input:
 - MinION reads : NaS_example_acineto/MinION_reads_Acinetobacter_baylyi.fa
 - Illumina reads : NaS_example_acineto/AWK_DOSF_1_?_A5KR6.IND3_clean.10prc.fastq
 
-
 Warning : At the moment, we only supported the following fastq format :
  - The sequence name line have to be a one field line
  - Sequence names have to end with '/1' (read1) and '/2' (read2)
@@ -80,6 +79,7 @@ ACTCAAAGAACAAGAGTTACAGTCTAAAAAAGCTGCGGTTGC...
 #################################################
 
 #################################################
+
 Program: NaS v2.0 : a fast hybrid strategy to generate long and error-free reads
 
 	--fq1        : illumina reads (R1) in fastQ format
@@ -102,16 +102,6 @@ Program: NaS v2.0 : a fast hybrid strategy to generate long and error-free reads
 	
 	-h           : help message
 	
-
-Warning : At the moment, we only supported the following fastq format :
-    - The sequence name line have to be a one field line
-    - Sequence names have to end with '/1' (read1) and '/2' (read2)
-Example :
-@M2:A5KR6:1:1101:9590:1008/1
-ACTCAAAGAACAAGAGTTACAGTCTAAAAAAGCTGCGGTTGC...
-+
-8ACCGGGGGGGGGGGGGGGGGGFGGGGGGGGGGGGGGGGGGG...
-
 Command to launch:
 
 `$(pwd)/NaS_v2/NaS --fq1 NaS_example_acineto/AWK_DOSF_1_1_A5KR6.IND3_clean.10prc.fastq --fq2 NaS_example_acineto/AWK_DOSF_1_2_A5KR6.IND3_clean.10prc.fastq --nano NaS_example_acineto/MinION_reads_Acinetobacter_baylyi.fa --out NaS_example --nb_proc 5`
