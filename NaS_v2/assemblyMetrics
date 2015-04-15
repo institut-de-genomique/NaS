@@ -112,3 +112,6 @@ echo "#-------------------- BASE COMPOSITION --------------------#"
 cat /tmp/basecompo.$$
 echo "#----------------------------------------------------------#"
 
+rm /tmp/metrics.$$ /tmp/basecompo.$$
+
+
