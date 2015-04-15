@@ -229,11 +229,11 @@ sub error {
 
 sub usage {
     my $usage = "------------------------------------------------------------------------------------
-$PRG_NAME - Retrieve similar reads of the seed read for one MiniIon Read
+$PRG_NAME - Retrieve similar reads of the seed read for one MiniIon read
 -reads : a file with on each line all this elements separate with just a space in this order :
 [sequence name line without /1 and /2 at the end] [sequence for read /1] [sequence for read /2] [fastQ quality for read /1] [fastQ quality for read /2]
 -r1 : illumina reads (R1) in fastQ format
--r1 : illumina reads (R2) in fastQ format
+-r2 : illumina reads (R2) in fastQ format
 -psl : psl file of illumina read aligned on one MiniIon read
 -prefix : directory for tempory data (current directory by default)
 -name : name of the output file
