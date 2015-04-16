@@ -33,6 +33,7 @@ PRE-REQUISITES
   - Perl 5.8.0 or higher installed.
   - Perl graph library (http://search.cpan.org/~jhi/Graph-0.94/)
   - Perl GetOpt module (http://search.cpan.org/dist/Getopt-Long/)
+  - Perl Set::IntSpan module (http://search.cpan.org/~swmcd/Set-IntSpan-1.19/IntSpan.pm)
   - Newbler assembler v2.9 (available from 454 website)
   - Blat binary (at least v35) accessible through your PATH environnment variable
 
