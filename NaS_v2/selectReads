@@ -230,7 +230,7 @@ sub error {
 sub usage {
     my $usage = "------------------------------------------------------------------------------------
 $PRG_NAME - Retrieve reads similar to seeds reads previously found for one MiniIon read
--reads : a file with on each line all this elements separate with just a space in this order :
+-reads : a file which contain all illumina reads (R1 + R2) organize with on each line all this elements separate with just a space in this order :
 [sequence name line without /1 or /2 at the end] [sequence for read /1] [sequence for read /2] [fastQ quality for read /1] [fastQ quality for read /2]
 -r1 : illumina reads (R1) in fastQ format
 -r2 : illumina reads (R2) in fastQ format
