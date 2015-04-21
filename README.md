@@ -56,7 +56,7 @@ INSTALLATION
   2. Modify path to newbler and blat binaries (in NaS script, your PATH variable)
   3. Modify if needed the Perl and sh interpreters that have been set to : /usr/bin/perl and /bin/sh
   4. To test the program download this example dataset       
-  `wget http://www.genoscope.cns.fr/nas/datasets/NaS_example_acineto.tar.gz`
+  `wget http://www.genoscope.cns.fr/externe/nas/datasets/NaS_example_acineto.tar.gz`
   5. Untar/unzip the archive :        
   `tar -zxvf NaS_example_acineto.tar.gz`
   6. Run NaS : `$(pwd)/NaS_v2/NaS --fq1 NaS_example_acineto/AWK_DOSF_1_1_A5KR6.IND3_clean.10prc.fastq --fq2 NaS_example_acineto/AWK_DOSF_1_2_A5KR6.IND3_clean.10prc.fastq --nano NaS_example_acineto/MinION_reads_Acinetobacter_baylyi.fa --out NaS_example --nb_proc 5`
