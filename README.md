@@ -30,6 +30,7 @@ PRE-REQUISITES
 
   - A Linux based operating system.
   - Binaries are provided for the following platform : Linux x86_64
+  - Shell tool GNU Parallel ( http://www.gnu.org/software/parallel/ )
   - Perl 5.8.0 or higher installed.
   - Perl graph library (http://search.cpan.org/~jhi/Graph-0.94/)
   - Perl GetOpt module (http://search.cpan.org/dist/Getopt-Long/)
