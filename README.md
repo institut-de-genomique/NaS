@@ -59,7 +59,10 @@ INSTALLATION
   `wget http://www.genoscope.cns.fr/externe/nas/datasets/NaS_example_acineto.tar.gz`
   5. Untar/unzip the archive :        
   `tar -zxvf NaS_example_acineto.tar.gz`
-  6. Run NaS : `$(pwd)/NaS_v2/NaS --fq1 NaS_example_acineto/AWK_DOSF_1_1_A5KR6.IND3_clean.10prc.fastq --fq2 NaS_example_acineto/AWK_DOSF_1_2_A5KR6.IND3_clean.10prc.fastq --nano NaS_example_acineto/MinION_reads_Acinetobacter_baylyi.fa --out NaS_example --nb_proc 5`
+  6. Run NaS : 
+```
+$(pwd)/NaS_v2/NaS --fq1 NaS_example_acineto/AWK_DOSF_1_1_A5KR6.IND3_clean.10prc.fastq --fq2 NaS_example_acineto/AWK_DOSF_1_2_A5KR6.IND3_clean.10prc.fastq --nano NaS_example_acineto/MinION_reads_Acinetobacter_baylyi.fa --out NaS_example --nb_proc 5
+```
 
 RUNNING NaS
 --------------
@@ -108,7 +111,9 @@ ACTCAAAGAACAAGAGTTACAGTCTAAAAAAGCTGCGGTTGC...
 	
 ### Command to launch
 
-`$(pwd)/NaS_v2/NaS --fq1 NaS_example_acineto/AWK_DOSF_1_1_A5KR6.IND3_clean.10prc.fastq --fq2 NaS_example_acineto/AWK_DOSF_1_2_A5KR6.IND3_clean.10prc.fastq --nano NaS_example_acineto/MinION_reads_Acinetobacter_baylyi.fa --out NaS_example --nb_proc 5`
+```
+$(pwd)/NaS_v2/NaS --fq1 NaS_example_acineto/AWK_DOSF_1_1_A5KR6.IND3_clean.10prc.fastq --fq2 NaS_example_acineto/AWK_DOSF_1_2_A5KR6.IND3_clean.10prc.fastq --nano NaS_example_acineto/MinION_reads_Acinetobacter_baylyi.fa --out NaS_example --nb_proc 5
+```
 
 ### Result
 `[lun. mars 30 10:41:40 CEST 2015] Create output directory : /env/cns/home/ggautrea/NaS_example`
