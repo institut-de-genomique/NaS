@@ -72,6 +72,7 @@ The directory "NaS_example_acineto" provides an example of a NaS run performed o
 
 ### Input
 - MinION reads : NaS_example_acineto/MinION_reads_Acinetobacter_baylyi.fa
+Sequence name line can not contain slash
 - Illumina reads : NaS_example_acineto/AWK_DOSF_1_?_A5KR6.IND3_clean.10prc.fastq
 
 Warning : At the moment, we only supported the following fastq format :
