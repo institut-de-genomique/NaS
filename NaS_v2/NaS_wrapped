@@ -56,7 +56,7 @@ function usage(){
     printf "\t--step       : ONLY in fast mode : step size parameter of blat, default is 5\n"
     printf "\t--a	       : ONLY in sensitive mode : gap existence cost parameter of last, default is 1\n"
     printf "\t--b	       : ONLY in sensitive mode : gap extension cost parameter of last, default is 1\n"
-    printf "\t--e	       : ONLY in sensitive mode : score threshold parameter of last, default is 120\n"
+    printf "\t--e	       : ONLY in sensitive mode : score threshold parameter of last, default is 40\n"
     printf "\t--nb_proc    : Number of parallel task, default is 1\n"
     printf "\t-h           : help message\n\n"
     printf "Warning : At the moment, we only supported the following fastq format :\n"
