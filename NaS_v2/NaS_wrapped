@@ -51,8 +51,12 @@ function usage(){
     printf "\t--out        : Output directory, default is NaS_date_pid\n"
     printf "\t--covmin1    : minimal coverage during contig filtering step, default is 10\n"
     printf "\t--covmin2    : minimal coverage to validate NaS read, default is 10\n"
-    printf "\t--tile       : tile size parameter of blat, default is 10\n"
-    printf "\t--step       : step size parameter of blat, default is 5\n"
+    printf "\t--mode    : mode : fast or sensitive. fast mode use blat as aligner whereas sensitive mode use last, default is fast"
+    printf "\t--tile       : ONLY in fast mode : tile size parameter of blat, default is 10\n"
+    printf "\t--step       : ONLY in fast mode : step size parameter of blat, default is 5\n"
+    printf "\t--a	       : ONLY in sensitive mode : gap existence cost parameter of last, default is 1\n"
+    printf "\t--b	       : ONLY in sensitive mode : gap extension cost parameter of last, default is 1\n"
+    printf "\t--e	       : ONLY in sensitive mode : score threshold parameter of last, default is 120\n"
     printf "\t--nb_proc    : Number of parallel task, default is 1\n"
     printf "\t-h           : help message\n\n"
     printf "Warning : At the moment, we only supported the following fastq format :\n"
@@ -71,6 +75,11 @@ then
     usage
 fi
 
+BLAT=blat
+MODE=fast
+A=1
+B=1
+E=40
 TILE=10
 STEP=5
 ILMN_R1=
@@ -86,7 +95,6 @@ COMPAREADS=compareads2
 EXTRACTREADS=extract_reads
 UNTANGLE_GRAPH=untangle_complex_regions
 NEWBLER=runAssembly
-BLAT=blat
 
 while :; do
     case "$1" in
@@ -132,9 +140,26 @@ while :; do
 	    NB_PROC=$2
 	    shift 2
 	    ;; 
-        --) 
+	--mode)
+		MODE=$2
+		shift 2
+		;;
+	--a)
+		A=$2
+		shift 2
+		;;
+	--b)
+		B=$2
+		shift 2
+		;;
+	--e)
+		E=$2
+		shift 2
+	;;
+    --) 
 	    shift; 
 	    break;;
+	
 	-?*)
 	    printf 'WARN: Unknown option (ignored): %s\n' "$1" >&2
 	    exit 1
@@ -143,10 +168,11 @@ while :; do
 	    break
     esac
 done
- 
+
+echo "Number of parallel task : $NB_PROC" 
 d=`date`
 echo "[$d] Create output directory : "$OUTPUT_DIR
-mkdir $OUTPUT_DIR $OUTPUT_DIR/tmp $OUTPUT_DIR/reads $OUTPUT_DIR/reads2 $OUTPUT_DIR/compareads $OUTPUT_DIR/assemblies
+mkdir -p $OUTPUT_DIR $OUTPUT_DIR/tmp $OUTPUT_DIR/reads $OUTPUT_DIR/reads2 $OUTPUT_DIR/compareads $OUTPUT_DIR/assemblies
 
 d=`date`
 echo "[$d] Create fasta file from fastq..."
@@ -154,12 +180,20 @@ cat $ILMN_R1 $ILMN_R2 | paste - - - - | awk '{ print $1; print $2; }' | sed "s/@
 paste $ILMN_R1 $ILMN_R2 | paste - - - - | awk '{ gsub(/\/1$/, "", $1); print $1, $3, $4, $7, $8; }' > $OUTPUT_DIR/tmp/ILMN_inlinereads.fastq
 
 d=`date`
-echo "[$d] Alignement step..."
-cat $OUTPUT_DIR/tmp/ILMN_reads.fa | parallel -j $NB_PROC --block 10M --pipe --recstart ">" "$BLAT -tileSize=$TILE -stepSize=$STEP -noHead $NANO_READS stdin >(cat) >&2" > $OUTPUT_DIR/tmp/blat-alignment.tile$TILE.step$STEP.psl 2>$OUTPUT_DIR/tmp/blat-alignment.stderr
+echo "[$d] Alignement step in $MODE mode..."
+if [ "$MODE" == "fast" ]; then
+	cat $OUTPUT_DIR/tmp/ILMN_reads.fa | parallel -j $NB_PROC --block 10M --pipe --recstart ">" "$BLAT -tileSize=$TILE -stepSize=$STEP -noHead $NANO_READS stdin >(cat) >&2" > $OUTPUT_DIR/tmp/blat-alignment.tile$TILE.step$STEP.psl 2>$OUTPUT_DIR/tmp/blat-alignment.stderr
+elif [ "$MODE" == "sensitive" ]; then 
+	lastdb -Q 0 $OUTPUT_DIR/tmp/nanolastdb $NANO_READS
+	parallel-fasta -j $NB_PROC --block 10M "lastal -s 2 -T 0 -b $B -e $E -a $A -Q 0 $OUTPUT_DIR/tmp/nanolastdb" < $OUTPUT_DIR/tmp/ILMN_reads.fa > $OUTPUT_DIR/tmp/last-alignment.A$A.B$B.E$E.maf 2>$OUTPUT_DIR/tmp/last-alignment.stderr
+	d=`date`
+	echo "[$d] Convert maf file to psl file..."
+	maf-convert --noheader psl $OUTPUT_DIR/tmp/last-alignment.A$A.B$B.E$E.maf > $OUTPUT_DIR/tmp/last-alignment.A$A.B$B.E$E.psl
+fi
 
 d=`date`
 echo "[$d] Select reads..."
-cat $OUTPUT_DIR/tmp/blat-alignment.tile$TILE.step$STEP.psl | awk -v PFX=$OUTPUT_DIR/reads '{ file=PFX"/"$14".psl"; print $0>file; }'
+cat $OUTPUT_DIR/tmp/*.psl | awk -v PFX=$OUTPUT_DIR/reads '{ file=PFX"/"$14".psl"; print $0>file; }'
 
 d=`date`
 echo "[$d] Retrieve similar reads..."
