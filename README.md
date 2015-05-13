@@ -37,7 +37,7 @@ PRE-REQUISITES
   - Perl Set::IntSpan module (http://search.cpan.org/~swmcd/Set-IntSpan-1.19/IntSpan.pm)
   - Newbler assembler v2.9 (available from 454 website)
   - Blat binary (at least v35) accessible through your PATH environnment variable
-
+  - Last binary (at least 502) accessible through your PATH environnment variable
 
 DEPENDENCIES
 ------------
@@ -103,9 +103,17 @@ ACTCAAAGAACAAGAGTTACAGTCTAAAAAAGCTGCGGTTGC...
 	
 	--covmin2    : minimal coverage to validate NaS read, default is 10
 	
-	--tile       : tile size parameter of blat, default is 10
+	--mode    : mode : fast or sensitive. fast mode use blat as aligner whereas sensitive mode use last, default is fast
 	
-	--step       : step size parameter of blat, default is 5
+	--tile       : ONLY in fast mode : tile size parameter of blat, default is 10
+	
+	--step       : ONLY in fast mode : step size parameter of blat, default is 5
+	
+	--a	       : ONLY in sensitive mode : gap existence cost parameter of last, default is 1
+	
+	--b	       : ONLY in sensitive mode : gap extension cost parameter of last, default is 1
+	
+	--e	       : ONLY in sensitive mode : score threshold parameter of last, default is 40
 	
 	--nb_proc    : Number of parallel task, default is 1
 	
