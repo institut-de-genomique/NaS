@@ -147,8 +147,11 @@ $(pwd)/NaS_v2/NaS --fq1 NaS_example_acineto/AWK_DOSF_1_1_A5KR6.IND3_clean.10prc.
 
 ACKNOWLEDGMENTS
 ---------------
-Jean-Marc Aury, Amin Madoui and Stefan Engelen - NaS's authors
+
 
 This work was financially supported by the Genoscope, 
 Institut de Genomique, CEA and Agence Nationale de la 
 Recherche (ANR), and France Génomique (ANR-10-INBS-09-08).
+
+### NaS's developers
+Jean-Marc Aury, Amin Madoui, Stefan Engelen and Guillaume Gautreau 
