@@ -99,10 +99,6 @@ ACTCAAAGAACAAGAGTTACAGTCTAAAAAAGCTGCGGTTGC...
 	
 	--out        : Output directory, default is NaS_date_pid
 	
-	--covmin1    : minimal coverage during contig filtering step, default is 10
-	
-	--covmin2    : minimal coverage to validate NaS read, default is 10
-	
 	--mode    : mode : fast or sensitive. fast mode use blat as aligner whereas sensitive mode use last, default is fast
 	
 	--tile       : ONLY in fast mode : tile size parameter of blat, default is 10
