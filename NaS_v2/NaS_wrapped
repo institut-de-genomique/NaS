@@ -166,7 +166,7 @@ d=`date`
 echo "[$d] Alignement step in $MODE mode..."
 
 if [ "$MODE" == "fast" ]; then
-	cat $OUTPUT_DIR/tmp/ILMN_reads.fa | /env/cns/home/ggautrea/transfert/parallel-20150522/src/parallel -j $NB_PROC --cat --pipe --block 10M --recstart ">" "$BLAT -tileSize=$TILE -stepSize=$STEP -noHead $NANO_READS {} $OUTPUT_DIR/tmp/psl/blat-alignment.job{#}.tile$TILE.step$STEP.psl" >$OUTPUT_DIR/tmp/blat-alignment.stderr 
+	cat $OUTPUT_DIR/tmp/ILMN_reads.fa | parallel -j $NB_PROC --cat --pipe --block 10M --recstart ">" "$BLAT -tileSize=$TILE -stepSize=$STEP -noHead $NANO_READS {} $OUTPUT_DIR/tmp/psl/blat-alignment.job{#}.tile$TILE.step$STEP.psl" >$OUTPUT_DIR/tmp/blat-alignment.stderr 
 elif [ "$MODE" == "sensitive" ]; then 
 	lastdb -Q 0 $OUTPUT_DIR/tmp/nanolastdb $NANO_READS
 	parallel-fasta -j $NB_PROC --block 10M "lastal -s 2 -T 0 -b $B -e $E -a $A -Q 0 $OUTPUT_DIR/tmp/nanolastdb" < $OUTPUT_DIR/tmp/ILMN_reads.fa > $OUTPUT_DIR/tmp/last-alignment.A$A.B$B.E$E.maf 2>$OUTPUT_DIR/tmp/last-alignment.stderr
