@@ -138,7 +138,7 @@ $(pwd)/NaS_v2/NaS --fq1 NaS_example_acineto/AWK_DOSF_1_1_A5KR6.IND3_clean.10prc.
 
 `NbReads=  5  CumulativeSize=  31008  N50size=  7994  minSize=  2512  maxSize=  10464  avgSize=  6201.6  =>  /env/cns/home/ggautrea/NaS_example/NANO_reads.stats`
 
-`NbReads=  4  CumulativeSize=  34867  N50size=  9707  minSize=  4263  maxSize=  11971  avgSize=  8716.75  =>  /env/cns/home/ggautrea/NaS_example/NaS_hqctg_reads.stats`
+`NbReads=  5  CumulativeSize=  38036  N50size=  9743  minSize=  1982  maxSize=  12787  avgSize=  7607.2  =>  /env/cns/home/ggautrea/NaS_example/NaS_hqctg_reads.stats`
 
 ### Troubleshooting
 #### Exonerate Binaries
@@ -156,7 +156,6 @@ This error message appears when your version of parallel is too old. Update para
 
 ACKNOWLEDGMENTS
 ---------------
-
 
 This work was financially supported by the Genoscope, 
 Institut de Genomique, CEA and Agence Nationale de la 
