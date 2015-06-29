@@ -4,7 +4,7 @@ NaS is a hybrid approach developed to take advantage of data generated using Min
 NaS uses the MinION® read as a template 
 to recruit Illumina reads and, by performing a local assembly, 
 build a high-quality synthetic read. 
-In the first step, a stringent alignment using BLAT is performed
+In the first step, a stringent alignment using BLAT (fast mode) or LAST (sensitive mode) is performed
 to retrieve Illumina short reads and their complementary sequences,
 called seed-reads. 
 Next, the seed-read set is extended by searching for similar
@@ -29,8 +29,8 @@ PRE-REQUISITES
 --------------
 
   - A Linux based operating system.
-  - Binaries are provided for the following platform : Linux x86_64
-  - Shell tool GNU Parallel ( http://www.gnu.org/software/parallel/ ) at last (22052015)
+  - Binaries are provided for the following platform : Linux x86_64 (but some version like Ubuntu may not be compatible, see Troubleshooting)
+  - Shell tool GNU Parallel ( http://www.gnu.org/software/parallel/ ) at least (22052015)
   - Perl 5.8.0 or higher installed.
   - Perl graph library (http://search.cpan.org/~jhi/Graph-0.94/)
   - Perl GetOpt module (http://search.cpan.org/dist/Getopt-Long/)
@@ -140,6 +140,19 @@ $(pwd)/NaS_v2/NaS --fq1 NaS_example_acineto/AWK_DOSF_1_1_A5KR6.IND3_clean.10prc.
 
 `NbReads=  4  CumulativeSize=  34867  N50size=  9707  minSize=  4263  maxSize=  11971  avgSize=  8716.75  =>  /env/cns/home/ggautrea/NaS_example/NaS_hqctg_reads.stats`
 
+### Troubleshooting
+#### Exonerate Binaries
+```
+fastalength: error while loading shared libraries: libglib-1.2.so.0: cannot open shared object file: No such file or directory
+fastacomposition: error while loading shared libraries: libglib-1.2.so.0: cannot open shared object file: No such file or directory
+```
+This error message appears when exonerate binaries (fastalength and fastacompisition) provided with NaS are not compatible with your OS. To fix this issue, download sources from exonerate website: http://www.ebi.ac.uk/~guy/exonerate/ and compile them. Replace files : fastalength and fastacompisition in NaS_v2 directory.
+#### Parallel too old
+```
+Unknown option: cat
+Unknown option: cat
+```
+This error message appears when your version of parallel is too old. Update parallel to at least parallel22052015
 
 ACKNOWLEDGMENTS
 ---------------
