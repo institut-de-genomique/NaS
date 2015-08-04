@@ -22,6 +22,7 @@ FREE SOFTWARE LICENSE. Check out http://www.cecill.info/
 for more information about the contents of this license.
 
 NaS home on the web is http://www.genoscope.cns.fr/nas
+NaS is available on Docker Hub http://registry.hub.docker.com/u/rdbioseq/nas/
 
 Contact : nas [a] genoscope [.] cns [.] fr
 
