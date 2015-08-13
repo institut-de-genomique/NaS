@@ -1,9 +1,9 @@
 #!/bin/sh
 
 # Add Newbler, Last and Blat local copies to your PATH
-PATH=
+PATH="":$PATH
 # Add Perl graph, GetOpt,Perl Set::IntSpan module to your PERL5LIB PATH
-PERL5LIB=
+PERL5LIB="":$PATH
 # DO NOT MODIFY FROM THIS POINT !
 PATH=`dirname $0`/:$PATH
 export PATH
