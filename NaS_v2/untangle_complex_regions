@@ -80,6 +80,7 @@ my %id = ();
 my %name = ();
 my %contig_list = ();
 my %real_name = ();
+my %ori = ();
 
 my $THREE_P_IN = 0; 
 my $THREE_P_OUT = 3; 
@@ -121,56 +122,81 @@ if($max_seq_size < 1000) {
     exit 0;
 }
 
-########
-# Load contig graph
 warn "Loading elements ...\n" if !$SILENT;
 while(<$fh_cgraph>) {
     if($_ =~ /^(\d+)\s+(\S+)\s+(\d+)\s+(\d+\.\d+)$/ && $beg) {
-	my $contig = $2;
-	my $contig_id = ($1-1)*4;
-	$id{$contig}=$1;
-	$name{$1}=$contig;
-	$hcontigs{$contig} = $contig_id;
-	$g->add_edge($contig_id+$THREE_P_IN, $contig_id+$FIVE_P_OUT);
-	$g->set_edge_weight($contig_id+$THREE_P_IN, $contig_id+$FIVE_P_OUT, 0.01);
-	$g->add_edge($contig_id+$FIVE_P_IN, $contig_id+$THREE_P_OUT);
-	$g->set_edge_weight($contig_id+$FIVE_P_IN, $contig_id+$THREE_P_OUT, 0.01);
-	$coverage{$contig}=0;
-	$hcontigs{$contig_id+$THREE_P_IN}=$contig."\@3p";
-	$hcontigs{$contig_id+$FIVE_P_OUT}=$contig."\@5p";
-	$hcontigs{$contig_id+$FIVE_P_IN}=$contig."\@5p";
-	$hcontigs{$contig_id+$THREE_P_OUT}=$contig."\@3p";
-	$real_name{$contig_id+$THREE_P_IN}=$contig;
-	$real_name{$contig_id+$FIVE_P_OUT}=$contig;
-	$real_name{$contig_id+$FIVE_P_IN}=$contig;
-	$real_name{$contig_id+$THREE_P_OUT}=$contig;
+	my $contig_id = $1;
+	my $contig_name = $2;
+	$g->add_vertex($contig_id);
+	$real_name{$contig_id} = $contig_name;
+	$hcontigs{$contig_name} = $contig_id;
+	if(!defined $ctg_seq{$contig_name}) { $ctg_seq{$contig_name} = ""; }
 	$n_vertices++;
-	$n_edges+=2;
     }
     if($_ =~ /^C\s+(\d+)\s+(\S+)\s+(\d+)\s+(\S+)\s+(\d+)$/) {
-	if($beg) { warn "  $n_vertices vertices loaded.\n" if !$SILENT; }
+	if($beg) { warn "  $n_vertices vertices loaded.\n  Load edges...\n" if !$SILENT; }
 	$beg = 0;
-	my ($c1_in, $c1_out) = ($THREE_P_IN, $THREE_P_OUT);
-	my ($c2_in, $c2_out) = ($THREE_P_IN, $THREE_P_OUT);
-	if($2 eq "5'") { ($c1_in, $c1_out) = ($FIVE_P_IN, $FIVE_P_OUT); }
-	if($4 eq "5'") { ($c2_in, $c2_out) = ($FIVE_P_IN, $FIVE_P_OUT); }
-	my $contig_id1 = ($1-1)*4;
-	my $contig_id2 = ($3-1)*4;
-	my ($u1, $v1) = ($contig_id1+$c1_out, $contig_id2+$c2_in);
-	my ($u2, $v2) = ($contig_id2+$c2_out, $contig_id1+$c1_in);
-	$g->add_edge($u1, $v1);
-	$g->set_edge_weight($u1, $v1, 0.01);
-	$g->add_edge($u2, $v2);
-	$g->set_edge_weight($u2, $v2, 0.01);
+	my($contig1, $sens1, $contig2, $sens2) = ($1, $2, $3, $4);
+	$g->add_edge($contig1, $contig2);
+	$g->set_edge_weight($contig1, $contig2, 0.01);
+	$g->add_edge($contig2, $contig1);
+	$g->set_edge_weight($contig2, $contig1, 0.01);
 	$n_edges+=2;
+	getSens($contig1, $sens1, $contig2, $sens2, \%ori);
+    }
+    if($_ =~ /^S\s+(\d+)\s+(\d+)\s+(\S+)$/) {
+	if(!$beg) { warn "  $n_edges edges loaded.\n  Load scaffolds...\n" if !$SILENT; }
+	$beg = 1;
+	my @links = split(";", $3);
+	my $firstCtg = 0;
+	while(@links) {
+	    if($firstCtg == 0) {
+		my $f = shift(@links);
+		$f =~ /^(\d+):(\S+)$/;
+		$firstCtg = $1;
+	    }
+	    my $gap = shift(@links);
+	    if(!defined $gap) { next; }
+	    $gap =~ /^(\S+):(\d+)$/;
+	    my ($gapType,$gapSize) = ($1, $2);
+	    my $nextCtg = shift(@links);
+	    $nextCtg =~ /^(\d+):(\S+)$/;
+	    my $ctg2 = $1;
+	    if($gapType eq "gapBothNoEdges") {
+		my @path = $g->SP_Dijkstra($firstCtg, $ctg2);
+		if (scalar(@path) == 0) {
+		    $n_vertices++;
+		    my $gap_id = $n_vertices;
+		    my $gap_name = "gap".$gap_id;
+		    warn "Add gap ($gap_name) between $firstCtg et $ctg2 ; size=$gapSize\n";
+		    $g->add_vertex($gap_id);
+		    $real_name{$gap_id} = $gap_name;
+		    $hcontigs{$gap_name} = $gap_id;
+		    $ctg_seq{$gap_name} = "N"x$gapSize; 
+
+		    $g->add_edge($firstCtg, $gap_id);
+		    $g->set_edge_weight($firstCtg, $gap_id, 0.01);
+		    $g->add_edge($gap_id, $firstCtg);
+		    $g->set_edge_weight($gap_id, $firstCtg, 0.01);
+		    $n_edges+=2;
+
+		    $g->add_edge($gap_id, $ctg2);
+		    $g->set_edge_weight($gap_id, $ctg2, 0.01);
+		    $g->add_edge($ctg2, $gap_id);
+		    $g->set_edge_weight($ctg2, $gap_id, 0.01);
+		    $n_edges+=2;
+		}
+	    }
+	    $firstCtg = $1;
+	}
     }
     if($_ =~ /^I\s+(\d+)\s+(\S+)\s*(\S*)$/) {
-	$ctg_seq{$name{$1}}=$2;
+	$ctg_seq{$real_name{$1}}=$2;
 	$n_seq++;
     }
     if($_ =~ /^F/) { last; }
 }	    
-warn "  $n_edges edges and $n_seq sequences loaded.\n" if !$SILENT;
+warn "  $n_vertices vertices, $n_edges edges and $n_seq sequences loaded.\n" if !$SILENT;
 
 open(my $fh_ctg_seq, ">", "$NEWBLER_DIR/AllContigs.fa") or die "cannot open > $NEWBLER_DIR/AllContigs.fa: $!";
 while(my ($k, $v) = each %ctg_seq) {
@@ -183,33 +209,42 @@ while(my ($k, $v) = each %ctg_seq) {
 my $cmd_idx = "$LASTDB -Q 0 $NEWBLER_DIR/idx_last $NANO";
 system($cmd_idx) == 0 or die "system $cmd_idx failed: $?";
 
-my $cmd_last = "$LASTAL -s 2 -T 0 -Q 0 -a 1 $NEWBLER_DIR/idx_last $NEWBLER_DIR/AllContigs.fa > $NEWBLER_DIR/last_ali";
+my $cmd_last = "$LASTAL -s 2 -T 0 -Q 0 -a 1 -e 40 $NEWBLER_DIR/idx_last $NEWBLER_DIR/AllContigs.fa > $NEWBLER_DIR/last_ali";
 system($cmd_last) == 0 or die "system $cmd_last failed: $?";
 
 my $LAST_OUT = "last_ali.tab";
-my $cmd_convert = "$MAFCONVERT tab $NEWBLER_DIR/last_ali > $NEWBLER_DIR/$LAST_OUT";
+my $cmd_convert = "$MAFCONVERT tab --noheader $NEWBLER_DIR/last_ali > $NEWBLER_DIR/$LAST_OUT";
 system($cmd_convert) == 0 or die "system $cmd_convert failed: $?";
 
 
 my($fh_last);
-open($fh_last, "cat $NEWBLER_DIR/$LAST_OUT | grep -v \\# | sort -k1,1nr |") or die "cannot open < $NEWBLER_DIR/$LAST_OUT: $!";
+open($fh_last, "cat $NEWBLER_DIR/$LAST_OUT | sort -k1,1nr |") or die "cannot open < $NEWBLER_DIR/$LAST_OUT: $!";
 
 use Data::Dumper;
 warn "Loading last alignment ...\n" if !$SILENT;
 my @ctgs = ();
 while(<$fh_last>) {
     if($_ =~ /^#/) { next; }
-    if($_ =~ /^(\d+)\s+(\S+)\s+(\d+)\s+(\d+)\s+(\S+)\s+(\d+)\s+(\S+)\s+(\d+)\s+(\d+)\s+(\S+)\s+(\d+)/) {
-	my %ctg = ();
-	$ctg{'name'}=$7;
-	$ctg{'strand'}=$10;
-	$ctg{'score'}=$1;
-	$ctg{'debNano'}=$3;
-	$ctg{'endNano'}=$3+$4;
-	$ctg{'debCtg'}=$8;
-	$ctg{'endCtg'}=$8+$9;
-	if(correctHit(\%ctg) && !overlapExistingHit(\@ctgs, \%ctg)) {
-	    push(@ctgs, \%ctg);
+    if($_ =~ /^(\d+)\s+(\S+)\s+(\d+)\s+(\d+)\s+(\S+)\s+(\d+)\s+(\S+)\s+(\d+)\s+(\d+)\s+(\S+)\s+(\d+).*E=(\S+)$/) {
+	my($n, $or, $sc, $dN, $eN, $dC, $eC, $e) = ($7, $10, $1, $3, $3+$4, $8, $8+$9, $12);
+	$e =~ /(\d*\.?\d*(?:[\+\-eE]+)?\d+)/;
+	my $evalue = $1;
+	$evalue =~ s/^e/1e/i;
+	if($evalue < 1e-5) {
+	    my %ctg = ();
+	    $ctg{'name'}=$n;
+	    $ctg{'strand'}=$or;
+	    $ctg{'score'}=$sc;
+	    $ctg{'debNano'}=$dN;
+	    $ctg{'endNano'}=$eN;
+	    $ctg{'debCtg'}=$dC;
+	    $ctg{'endCtg'}=$eC;
+	    #print Dumper(\%ctg), "\n";
+	    #print Dumper(\@ctgs), "\n";
+	    #print "************************************************\n";
+	    if(correctHit(\%ctg) && !overlapExistingHit(\%ctg, \@ctgs)) {
+		push(@ctgs, \%ctg);
+	    }
 	}
     }
 }
@@ -256,7 +291,8 @@ if(@ctgs == 0) {
 			$g1->set_edge_weight($u, $v, 0.01);
 		    }
 		}
-		my ($n_v, $n_e) = ($g1->vertices(), $g1->edges());
+		my $n_v = $g1->vertices();
+		my $n_e = $g1->edges();
 		warn "   New graph V= $n_v vertices and E= $n_e edges\n";
 	    }
 	}
@@ -267,6 +303,8 @@ if($g->vertices() > 1000) {
     warn "[Warning] graph is too complex, erase vertices\n";
     $g = new Graph::Directed->new(); 
 }
+#print $g, "\n";
+#print Dumper(\%real_name), "\n";
 my @hits_list = ();
 foreach my $hit (@sorted_ctgs) {
     my @vertices = $g->vertices();
@@ -279,15 +317,17 @@ foreach my $hit (@sorted_ctgs) {
 }
 @sorted_ctgs = @hits_list;
 	
+
 #
 # Find best path
 my $s = 0;
 if(@sorted_ctgs>1) { 
-    $s = existPath2($g, \@sorted_ctgs, \%real_name, \@s_ctgs);
+    $s = existPath2($g, \@sorted_ctgs, \%real_name, \@s_ctgs, \%ori);
 } elsif(@sorted_ctgs==1) {
     $s = $sorted_ctgs[0]->{'score'};
     push(@s_ctgs, $sorted_ctgs[0]);
 }
+#warn "$s\n";
 if($s == 0) {
      my $best_ali = $ctgs[0];
      my %h = ();
@@ -335,6 +375,14 @@ while ($is <= $ls) {
     $is = $is + 60;
 }
 close($fho_seq);
+
+sub getSens {
+    my ($contig1, $sens1, $contig2, $sens2, $ori) = @_;
+    if($sens1 eq "3'" && $sens2 eq "3'") { $ori->{$contig1} = "+"; $ori->{$contig2} = "-"; return 1; }
+    if($sens1 eq "5'" && $sens2 eq "5'") { $ori->{$contig1} = "-"; $ori->{$contig2} = "+"; return 1; }
+    if($sens1 eq "3'" && $sens2 eq "5'") { $ori->{$contig1} = "-"; $ori->{$contig2} = "-"; return 1; }
+    if($sens1 eq "5'" && $sens2 eq "3'") { $ori->{$contig1} = "+"; $ori->{$contig2} = "+"; return 1; }
+}
 
 sub chainHits {
     my($ctgs) = @_;
@@ -384,19 +432,22 @@ sub correctHit {
 }
 
 sub overlapExistingHit {
-    my ($ctgs, $ctg) = @_;
+    my ($ctg, $ctgs) = @_;
+    my $overlap = 0;
     foreach(@$ctgs) {
 	#if($_->{'name'} ne $ctg->{'name'}) { next; }
+	#print "Hit : ", Dumper($ctg), "\n";
+	#print "Overlap : ", Dumper($_), "\n";
+	#print "********\n";
 	my($first, $second) = ($_, $ctg);
 	if($ctg->{'debNano'} < $_->{'debNano'}) { ($first, $second) = ($ctg, $_); }
-	if($first->{'endNano'} > $second->{'debNano'}) { 
-	    #print "Hit : ", Dumper($_), "\n";
-	    #print "Overlap : ", Dumper($ctg), "\n";
-	    #print "********\n";
-	    return 1;
-	}
+
+	if(($first->{'endNano'} <= $second->{'debNano'} + 50) &&
+	    $first->{'score'} >= 200 && $second->{'score'} >= 200) { next }
+
+	if($first->{'endNano'} > $second->{'debNano'}) { $overlap = 1; }
     }
-    return 0;
+    return $overlap;
 }
 
 sub existPath {
@@ -417,49 +468,54 @@ sub existPath {
 }
 		
 sub existPath2 {
-    my($g, $ctgs, $r_name, $ctgs_new) = @_;
+    my($g, $ctgs, $r_name, $ctgs_new, $ori) = @_;
     warn "Launch APSP\n";
     my $apsp = $g->APSP_Floyd_Warshall();
     warn " done.\n";
     my @path = ();
     my $score = 0;
-    my ($previous, $previous_name) = (undef, "");;
+    my ($p_ctg, $previous, $previous_name) = (undef, undef, "");;
+    #print Dumper($ctgs), "\n";
     foreach(@$ctgs) {
-	my ($c_in, $c_out) = ($FIVE_P_IN, $THREE_P_OUT);
-	if($_->{'strand'} eq "-") { 
-	    ($c_in, $c_out) = ($THREE_P_IN, $FIVE_P_OUT); 
-	}
-	if(defined $previous && $_->{'nondirect'}) {
-	    my @v = $apsp->path_vertices($previous, $hcontigs{$_->{'name'}}+$c_in);
-	    if(scalar(@v)>0) {
-		warn "Add vertices to go from $previous_name to $_->{'name'}\n";
-		my $first = 1;
-		my %seen = ();
-		pop @v;
-		foreach(@v) {
-		    if($first) { $first = 0; next; }
-		    #warn "$_ ";
-		    push(@path, $_);
-		    if(!$seen{$r_name->{$_}}) { 
-			my %h = ();
-			$h{'name'} = $r_name->{$_};
-			$h{'strand'}="+"; 
-			if($_%4 == 0) { $h{'strand'}="-"; } 
-			push(@$ctgs_new, \%h);
-			$score += 1;
-			$seen{$r_name->{$_}}=1;
+	#my ($c_in, $c_out) = ($FIVE_P_IN, $THREE_P_OUT);
+	#if($_->{'strand'} eq "-") { 
+	#    ($c_in, $c_out) = ($THREE_P_IN, $FIVE_P_OUT); 
+	#}
+	if(defined $previous && ($_->{'debNano'} - $p_ctg->{'endNano'} <= 1000)) {
+	    if(defined $previous && !$g->has_edge($previous, $hcontigs{$_->{'name'}})) {#$_->{'nondirect'}) {
+		my @v = $apsp->path_vertices($previous, $hcontigs{$_->{'name'}});
+		if(scalar(@v)>0) {
+		    warn "Add vertices to go from $previous_name to $_->{'name'}\n";
+		    my $first = 1;
+		    my %seen = ();
+		    pop @v;
+		    foreach(@v) {
+			if($first) { $first = 0; next; }
+			#warn "$_ ";
+			push(@path, $_);
+			if(!$seen{$r_name->{$_}}) { 
+			    my %h = ();
+			    $h{'name'} = $r_name->{$_};
+			    my $strand = (defined $ori->{$_}) ? $ori->{$_} : "+";
+			    $h{'strand'} = $strand;
+			    push(@$ctgs_new, \%h);
+			    $score += 1;
+			    $seen{$r_name->{$_}}=1;
+			}
 		    }
+		    #warn "\n";
 		}
-		#warn "\n";
 	    }
 	}
 	$score += $_->{'score'};
-	push(@path, $hcontigs{$_->{'name'}}+$c_in);
-	push(@path, $hcontigs{$_->{'name'}}+$c_out);
-	$previous = $hcontigs{$_->{'name'}}+$c_out;
+	push(@path, $hcontigs{$_->{'name'}});
+	$previous = $hcontigs{$_->{'name'}};
 	$previous_name = $_->{'name'};
+	$p_ctg = $_;
 	push(@$ctgs_new, $_);
     }
+    #warn "score= $score\n";
+    #print Dumper(\@path), "\n";
     if($g->has_path(@path)) { 
 	warn "Find path with score : $score\n";
 	return $score; 

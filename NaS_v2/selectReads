@@ -51,16 +51,17 @@ use Data::Dumper;
 our $PRG_NAME = $0;
 our $COMPAREADS = 'compareads2';
 our $EXTRACTREADS = 'extract_reads';
-our $READSIZE = 300;
-our $MINCOV = 30;
+our $MINCOV = 10;
 our $MAXCOV = 200;
-
+our $WINDOW_SIZE = 1000;
+our $GAPCOV_THRESHOLD =5;
 my ($SILENT, $HELP) = (0, 0);
-my ($READS, $PSL, $PREFIX, $OUT, $NAME, $ILMN_R1, $ILMN_R2) = ("", "", ".", "out.fastq", "", "", "");
+my ($READS, $PSL, $PREFIX, $OUT, $NAME, $ILMN_R1, $ILMN_R2, $READSIZE) = ("", "", ".", "out.fastq", "", "", "",300);
 
 my $result = &GetOptions("reads=s"  => \$READS,
 			 "r1=s"     => \$ILMN_R1,
 			 "r2=s"     => \$ILMN_R2,
+			 "size=s"   => \$READSIZE,
 			 "psl=s"    => \$PSL,
 			 "prefix=s" => \$PREFIX,
 			 "name=s"   => \$NAME,
@@ -72,25 +73,37 @@ my $result = &GetOptions("reads=s"  => \$READS,
 if (!$result) { error(); }
 if($HELP) { usage(); }
 
-system("mkdir -p $PREFIX/tmp/badreads $PREFIX/tmp/seedreads/ $PREFIX/compareads/$NAME.R1 $PREFIX/compareads/$NAME.R2");
-my ($fh_reads, $fh_psl, $fh_badreads, $fh_seedreads);
+system("mkdir -p $PREFIX/tmp/badreads $PREFIX/tmp/seedreads/ $PREFIX/compareads/$NAME.R1 $PREFIX/compareads/$NAME.R2 $PREFIX/tmp/cov/ $PREFIX/tmp/aligned_reads/");
+my ($fh_reads, $fh_psl, $fh_badreads, $fh_seedreads,$fh_cov,$fh_aligned_reads);
 my $seedreads = "$PREFIX/tmp/seedreads/$NAME.fq";
 open($fh_reads, "<", $READS) or die "cannot open < $READS: $!";
 open($fh_psl, "cat $PSL | awk '{ print \$1-\$6-\$8, \$0; }' | sort -k1,1nr | ") or die "cannot open < $PSL: $!";
 open($fh_badreads, ">", "$PREFIX/tmp/badreads/$NAME") or die "cannot open > $PREFIX/tmp/badreads/$NAME : $!";
 open($fh_seedreads, ">", $seedreads) or die "cannot open > $seedreads : $!";
-
+open($fh_cov, ">", "$PREFIX/tmp/cov/$NAME.cov") or die "cannot open > $PREFIX/tmp/cov/$NAME.cov : $!";
+open($fh_aligned_reads, ">", "$PREFIX/tmp/aligned_reads/$NAME.fq") or die "cannot open > $PREFIX/tmp/aligned_reads/$NAME.fq : $!";
 
 my $NB_SETS = 30;
 my @sets = ();
+
+my @cov = ();#contain reads aligned on a base position (1 to sizeNano)
+
+
 for(my $i=0; $i<$NB_SETS; $i++) { push(@sets, new Set::IntSpan("-")); }
 
 my (%seen, %goodreads, %badreads) = ((), (), ());
 my ($sizeNano, $nb_bad_reads_detected) = (0, 0);
 
 while(<$fh_psl>) {
+
     my @fields = split;
     $sizeNano = $fields[15];
+    
+    if (!keys %seen){#just at the first iteration on psl file
+	for(my $i=1;$i<=$sizeNano;$i++) { $cov[$i]=""; }
+	if ($sizeNano<$WINDOW_SIZE){$WINDOW_SIZE=$sizeNano;}# for very short nanopore reads
+    }
+
     my $s = $fields[16]."-".$fields[17];
     my $set_s = new Set::IntSpan($s);
     my $valid = 0;
@@ -106,7 +119,12 @@ while(<$fh_psl>) {
 	    if(Set::IntSpan::size($i_set)<0.9*Set::IntSpan::size($set_s)) {
 		#my $e_s = ($fields[16]-10)."-".($fields[17]+10);
 		$curr_set->U($s);
-		$goodreads{"@".$name} = 1;
+		
+		if ( !defined $goodreads{"@".$name} ){
+			for(my $i=$fields[16];$i<=$fields[17];$i++) { $cov[$i] .= "\@$name";}	
+		}
+		$goodreads{"@".$name} = 1;	
+
 		$valid = 1;
 		last;
 	    }
@@ -117,12 +135,70 @@ while(<$fh_psl>) {
 	$nb_bad_reads_detected++;
 	print $fh_badreads $name, "\n"; 
     }
+
+
 }
+
+my %side_gaps_reads = ();
+my $all_gaps_size = 0;
+print $fh_cov "base_position coverage\n";
+
+if (scalar(@cov)>0){
+for(my $i=1;$i<=$sizeNano;$i++){# we can change $i++ by i+=20
+
+my @Reads_At_this_Position = split ("@",$cov[$i]);
+
+shift @Reads_At_this_Position;#delete blank
+
+
+print $fh_cov $i." ".scalar(@Reads_At_this_Position)."\n";#create a plot file, use (cat filename.cov | sed "1d" | xmgrace -) to visualize it
+
+	if (scalar(@Reads_At_this_Position)<$GAPCOV_THRESHOLD){# if there is a gap
+		# we browse a windows centered on this position
+		$all_gaps_size++;
+		my $lower_bound = $i-($WINDOW_SIZE/2);
+		if ($lower_bound<1) {$lower_bound=1;}
+		my $upper_bound = $i+($WINDOW_SIZE/2);
+		if ($upper_bound>$sizeNano) {$upper_bound=$sizeNano;}
+	
+		
+		for (my $j=$lower_bound;$j<$upper_bound;$j++){
+			@Reads_At_this_Position = split ("@",$cov[$j]);
+			shift @Reads_At_this_Position;#delete blank
+			foreach (@Reads_At_this_Position){
+				$side_gaps_reads{"@".$_}=1;
+				#print "@".$_."\n";
+				
+			}
+				
+		}
+	}
+}
+}
+warn "[$NAME] Size nano : $sizeNano, cumulative size of gap : $all_gaps_size, number of gap side reads found :".scalar(keys %side_gaps_reads)." \n";
+
 
 while(<$fh_reads>) {
     my @fields = split;
     my $name = $fields[0];
     if(defined $goodreads{$name} && $goodreads{$name} == 1) {
+	print $fh_aligned_reads $name."/1\n";
+	print $fh_aligned_reads $fields[1]."\n";
+	print $fh_aligned_reads "+\n";
+	print $fh_aligned_reads $fields[3]."\n";
+	print $fh_aligned_reads $name."/2\n";
+	print $fh_aligned_reads $fields[2]."\n";
+	print $fh_aligned_reads "+\n";
+	print $fh_aligned_reads $fields[4]."\n";
+    }
+}
+seek($fh_reads, 0, 0);
+while(<$fh_reads>) {
+    my @fields = split;
+    my $name = $fields[0];
+
+    if(defined $side_gaps_reads{$name} && $side_gaps_reads{$name} == 1) {
+	
 	print $fh_seedreads $name."/1\n";
 	print $fh_seedreads $fields[1]."\n";
 	print $fh_seedreads "+\n";
@@ -134,18 +210,19 @@ while(<$fh_reads>) {
     }
 }
 
+
 my ($stop, $cycle) = (0, 1);
-my $max_nb_reads = ($sizeNano * $MAXCOV) / (2*$READSIZE);
-my $min_nb_reads = ($sizeNano * $MINCOV) / (2*$READSIZE);
+my $max_nb_reads = (($all_gaps_size+$WINDOW_SIZE) * $MAXCOV) / (2*$READSIZE);# we add window Size to ensure recruitment on the 2 extremities
+my $min_nb_reads = ($all_gaps_size * $MINCOV) / (2*$READSIZE);
 my $nb_recruitreads = 0;
 my %recruitreads = ();
 while(!$stop) {
     %recruitreads = ();
     system("mkdir -p $PREFIX/compareads_$cycle $PREFIX/tmp/seedreads_$cycle");
-    $nb_recruitreads = extractReads($seedreads, $PREFIX."/compareads_".$cycle, 3, 
-				    $ILMN_R1, $ILMN_R2, $NAME, \%recruitreads);    
-    if($nb_recruitreads > $min_nb_reads) { $stop = 1; }
-    if($cycle >= 5) { $stop = 1; }
+    $nb_recruitreads = extractReads($seedreads, $PREFIX."/compareads_".$cycle, 3,
+				    $ILMN_R1, $ILMN_R2, $NAME, \%recruitreads,\%goodreads);
+    if($nb_recruitreads > $min_nb_reads) { $stop = 1;}
+    if($cycle >= 5) { $stop = 1;}
     if(!$stop) {
 	my $file_seedreads = "$PREFIX/tmp/seedreads_$cycle/$NAME.fq";
 	getReads($NAME, \%recruitreads, $file_seedreads, {}, $fh_reads, $max_nb_reads);
@@ -155,15 +232,15 @@ while(!$stop) {
 }
 $cycle--;
 warn "[$NAME] $cycle cycle(s) of read recruitment performed, $nb_recruitreads reads found\n";
-if($nb_bad_reads_detected + $nb_recruitreads <= $max_nb_reads) { %badreads = (); }
+if($nb_bad_reads_detected + $nb_recruitreads +scalar(keys %goodreads) <= $max_nb_reads) { %badreads = (); }
 
 getReads($NAME, \%recruitreads, $OUT, \%badreads, $fh_reads, $max_nb_reads);
 
-
+system ("cat $PREFIX/tmp/aligned_reads/$NAME.fq >> $OUT");
 
 
 sub extractReads {
-    my($seedfile, $p, $t, $ilR1, $ilR2, $n, $recruitreads) = @_;
+    my($seedfile, $p, $t, $ilR1, $ilR2, $n, $recruitreads,$goodreads) = @_;
     my $cmd_cprR1 = "$COMPAREADS -a $seedfile -b $ilR1 -o $p/$n.R1 -l $p/compareads_log/ -t $t 2>>$p/compareadsR1.stderr";
     my $cmd_cprR2 = "$COMPAREADS -a $seedfile -b $ilR2 -o $p/$n.R2 -l $p/compareads_log/ -t $t 2>>$p/compareadsR2.stderr";
     system($cmd_cprR1) == 0 or die "system $cmd_cprR1 failed: $?";
@@ -180,8 +257,14 @@ sub extractReads {
     my $nb_recruitreads = 0;
     while(<$fh_recruitreads>) {
 	chomp;
-	$recruitreads->{"@".$_}=1;
-	$nb_recruitreads++;
+	my $name="@".$_;
+	if(defined $goodreads->{$name} && $goodreads->{$name}==1){
+		next;
+	}
+	else {
+		$recruitreads->{"@".$_}=1;
+		$nb_recruitreads++;
+	}
     }
     return $nb_recruitreads;
 }
@@ -194,7 +277,7 @@ sub getReads {
     seek($fh_reads, 0, 0);
     while(<$fh_reads>) {
 	if($nb_reads > $max_nb_reads) { 
-	    warn "[$n] reached max. number of reads : $nb_reads !\n"; 
+	    warn "[$n] reached max. number of recruit reads : $nb_reads ! Size nano : $sizeNano \n"; 
 	    last; 
 	}
 	my @fields = split;
@@ -234,6 +317,7 @@ $PRG_NAME - Retrieve reads similar to seeds reads previously found for one MiniI
 [sequence name line without /1 or /2 at the end] [sequence for read /1] [sequence for read /2] [fastQ quality for read /1] [fastQ quality for read /2]
 -r1 : illumina reads (R1) in fastQ format
 -r2 : illumina reads (R2) in fastQ format
+-size : size of illumina reads (default : 300 bases) 
 -psl : psl file of illumina seeds reads aligned on one MiniIon read
 -prefix : directory for tempory data (current directory by default)
 -name : name of the output file
@@ -243,5 +327,5 @@ $PRG_NAME - Retrieve reads similar to seeds reads previously found for one MiniI
 ------------------------------------------------------------------------------------\n";
 
    warn $usage;
-    exit 1;
+   exit 1;
 }

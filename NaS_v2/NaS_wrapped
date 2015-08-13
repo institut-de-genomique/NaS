@@ -39,7 +39,7 @@
 # * The fact that you are presently reading this means that you have had
 # * knowledge of the CeCILL license and that you accept its terms.
 ################################################################################
-VERSION=v2.0
+VERSION=v1.0
 
 set -o pipefail
 
@@ -49,13 +49,15 @@ function usage(){
     printf "\t--fq2        : illumina reads (R2) in fastQ format\n"
     printf "\t--nano       : nanopore long reads in fastA format\n"
     printf "\t--out        : Output directory, default is NaS_date_pid\n"
+    printf "\t--ilmn_size   : illumina reads size, default is 300 \n"
     printf "\t--mode    : mode : fast or sensitive. fast mode use blat as aligner whereas sensitive mode use last, default is fast"
     printf "\t--tile       : ONLY in fast mode : tile size parameter of blat, default is 10\n"
     printf "\t--step       : ONLY in fast mode : step size parameter of blat, default is 5\n"
     printf "\t--a	       : ONLY in sensitive mode : gap existence cost parameter of last, default is 1\n"
     printf "\t--b	       : ONLY in sensitive mode : gap extension cost parameter of last, default is 1\n"
-    printf "\t--e	       : ONLY in sensitive mode : score threshold parameter of last, default is 40\n"
+    printf "\t--e	       : ONLY in sensitive mode : score threshold parameter of last, default is 120\n"
     printf "\t--nb_proc    : Number of parallel task, default is 1\n"
+    printf "\t--rmtmp : yes or no : Delete temporary file, default is yes\n" 
     printf "\t-h           : help message\n\n"
     printf "Warning : At the moment, we only supported the following fastq format :\n"
     printf "    - The sequence name line have to be a one field line\n"
@@ -72,6 +74,8 @@ if [ $# -eq 0 ]
 then
     usage
 fi
+
+echo "Command : $0 $*"
 
 BLAT=blat
 MODE=fast
@@ -90,6 +94,8 @@ COMPAREADS=compareads2
 EXTRACTREADS=extract_reads
 UNTANGLE_GRAPH=untangle_complex_regions
 NEWBLER=runAssembly
+RMTMP=yes
+ILMN_size=300
 
 while :; do
     case "$1" in
@@ -138,7 +144,15 @@ while :; do
 	--e)
 		E=$2
 		shift 2
-	;;
+		;;
+	--rmtmp)
+		RMTMP=$2
+		shift 2
+		;;
+	--ilmn_size)
+		ILMN_size=$2
+		shift 2
+		;;
     --) 
 	    shift; 
 	    break;;
@@ -152,10 +166,11 @@ while :; do
     esac
 done
 
-echo "Number of parallel task : $NB_PROC" 
+BEFORE=`date +'%s'`
+
 d=`date`
 echo "[$d] Create output directory : "$OUTPUT_DIR
-mkdir -p $OUTPUT_DIR $OUTPUT_DIR/tmp $OUTPUT_DIR/tmp/psl $OUTPUT_DIR/reads $OUTPUT_DIR/reads2 $OUTPUT_DIR/compareads $OUTPUT_DIR/assemblies
+mkdir -p $OUTPUT_DIR $OUTPUT_DIR/tmp $OUTPUT_DIR/tmp/psl $OUTPUT_DIR/reads $OUTPUT_DIR/reads2 $OUTPUT_DIR/assemblies
 
 d=`date`
 echo "[$d] Create fasta file from fastq..."
@@ -172,7 +187,11 @@ elif [ "$MODE" == "sensitive" ]; then
 	parallel-fasta -j $NB_PROC --block 10M "lastal -s 2 -T 0 -b $B -e $E -a $A -Q 0 $OUTPUT_DIR/tmp/nanolastdb" < $OUTPUT_DIR/tmp/ILMN_reads.fa > $OUTPUT_DIR/tmp/last-alignment.A$A.B$B.E$E.maf 2>$OUTPUT_DIR/tmp/last-alignment.stderr
 	d=`date`
 	echo "[$d] Convert maf file to psl file..."
-	maf-convert --noheader psl $OUTPUT_DIR/tmp/last-alignment.A$A.B$B.E$E.maf > $OUTPUT_DIR/tmp/psl/last-alignment.A$A.B$B.E$E.psl
+        cat $OUTPUT_DIR/tmp/last-alignment.A$A.B$B.E$E.maf | parallel -j $NB_PROC --cat --pipe --block 10M --recstart "a score=" "maf-convert --noheader psl {} > $OUTPUT_DIR/tmp/psl/last-alignment.A$A.B$B.E$E.job{#}.psl" > $OUTPUT_DIR/tmp/maf-converter.stdout 2> $OUTPUT_DIR/tmp/maf-converter.stderr
+	head -16 $OUTPUT_DIR/tmp/last-alignment.A$A.B$B.E$E.maf > $OUTPUT_DIR/tmp/last-alignment_header.A$A.B$B.E$E.maf
+	rm $OUTPUT_DIR/tmp/last-alignment.A$A.B$B.E$E.maf
+else
+	echo "Invalid mode : $MODE"
 fi
 
 d=`date`
@@ -181,18 +200,57 @@ cat $OUTPUT_DIR/tmp/psl/*.psl | awk -v PFX=$OUTPUT_DIR/reads '{ file=PFX"/"$14".
 
 d=`date`
 echo "[$d] Retrieve similar reads..."
-ls -S $OUTPUT_DIR/reads/ | grep psl | sed "s/.psl//" | parallel -j $NB_PROC "selectReads -psl $OUTPUT_DIR/reads/{}.psl -reads $OUTPUT_DIR/tmp/ILMN_inlinereads.fastq -r1 $ILMN_R1 -r2 $ILMN_R2 -prefix $OUTPUT_DIR/tmp/ -name {} -out $OUTPUT_DIR/reads2/{}.fastq >(cat) >&2" > $OUTPUT_DIR/tmp/selectReads.stdout 2>$OUTPUT_DIR/tmp/selectReads.stderr
+ls -S $OUTPUT_DIR/reads/ | grep psl | sed "s/.psl//" | parallel -j $NB_PROC "selectReads -psl $OUTPUT_DIR/reads/{}.psl -reads $OUTPUT_DIR/tmp/ILMN_inlinereads.fastq -r1 $ILMN_R1 -r2 $ILMN_R2 -size $ILMN_size -prefix $OUTPUT_DIR/tmp/ -name {} -out $OUTPUT_DIR/reads2/{}.fastq >(cat) >&2" > $OUTPUT_DIR/tmp/selectReads.stdout 2>$OUTPUT_DIR/tmp/selectReads.stderr
 
 d=`date`
 echo "[$d] Generate NaS reads..."
-ls -S $OUTPUT_DIR/reads2/ | sed "s/.fastq//" | parallel -j $NB_PROC "mkdir $OUTPUT_DIR/assemblies/{}; cat $NANO_READS | FastaToTbl | awk -v seq={} '\$1==seq { print \$0; }' | TblToFasta > $OUTPUT_DIR/assemblies/{}/{}.fa; $NEWBLER -urt -force -noace -mi 99 -o $OUTPUT_DIR/assemblies/{} $OUTPUT_DIR/reads2/{}.fastq 1>$OUTPUT_DIR/assemblies/{}/runAssembly.out 2>$OUTPUT_DIR/assemblies/{}/runAssembly.err"
+ls -S $OUTPUT_DIR/reads2/ | sed "s/.fastq//" | parallel --timeout 2000% -j $NB_PROC "mkdir $OUTPUT_DIR/assemblies/{}; cat $NANO_READS | FastaToTbl | awk -v seq={} '\$1==seq { print \$0; }' | TblToFasta > $OUTPUT_DIR/assemblies/{}/{}.fa; $NEWBLER -urt -force -noace -mi 99 -o $OUTPUT_DIR/assemblies/{} $OUTPUT_DIR/reads2/{}.fastq 1>$OUTPUT_DIR/assemblies/{}/runAssembly.out 2>$OUTPUT_DIR/assemblies/{}/runAssembly.err"
 
+d=`date`
+echo "[$d] Untangle complex NaS reads..."
 ls -S $OUTPUT_DIR/reads2/ | sed "s/.fastq//" | parallel -j $NB_PROC "$UNTANGLE_GRAPH -newblerdir $OUTPUT_DIR/assemblies/{} -nano $OUTPUT_DIR/assemblies/{}/{}.fa -name {} 2>$OUTPUT_DIR/assemblies/{}/stderr_untangle2"
-cat $OUTPUT_DIR/assemblies/*/NaS_hqctg_reads_final.fa | FastaToTbl | perl -ne '@f=split; $f[1]=~/^([actgn]*)([ACTGN]+[ACTGNactgn]*[ACTGN]+)([actgn]*)$/; print $f[0], " ", $2, "\n";' | TblToFasta | sed "s=_contig[0-9]*\$==" > $OUTPUT_DIR/NaS_hqctg_reads.fa
-
+cat $OUTPUT_DIR/assemblies/*/NaS_hqctg_reads_final.fa | FastaToTbl | perl -ne '@f=split; $f[1]=~/^([actgn]*)([ACTGN]+[ACTGNactgn]*[ACTGN]+)([actgn]*)$/; if (length ($2)>0){print $f[0], " ", $2, "\n";}' | TblToFasta | sed "s=_contig[0-9]*\$==" > $OUTPUT_DIR/NaS_hqctg_reads.fa
 
 d=`date`
 echo "[$d] Generate statistics..."
 assemblyMetrics $NANO_READS > $OUTPUT_DIR/NANO_reads.stats
 assemblyMetrics $OUTPUT_DIR/NaS_hqctg_reads.fa > $OUTPUT_DIR/NaS_hqctg_reads.stats
 for i in $OUTPUT_DIR/NANO_reads.stats $OUTPUT_DIR/NaS_hqctg_reads.stats; do cat $i | awk -v FILE=$i '$1=="N50" { n50=$3; } $1=="Assembly" { nbreads=$5; cum=$3; minS=$7; maxS=$9; avg=$11} END { print "NbReads= ", nbreads, " CumulativeSize= ", cum, " N50size= ", n50, " minSize= ", minS, " maxSize= ", maxS, " avgSize= ", avg, " => ", FILE; }'; done
+
+
+
+if [ "$RMTMP" == "yes" ] && [ -s $OUTPUT_DIR/NaS_hqctg_reads.fa ]; then
+
+	d=`date`
+	echo "[$d] Delete temporary file..."
+
+	cp -r $OUTPUT_DIR/tmp/tmp/cov $OUTPUT_DIR
+	rm -r $OUTPUT_DIR/reads
+	rm -r $OUTPUT_DIR/tmp
+	gzip -r $OUTPUT_DIR/reads2
+	rm -r $OUTPUT_DIR/assemblies/*/sff
+	rm $OUTPUT_DIR/assemblies/*/454AlignmentInfo.tsv 
+	rm $OUTPUT_DIR/assemblies/*/454AllContigs.qual
+	rm $OUTPUT_DIR/assemblies/*/454LargeContigs.qual
+	rm $OUTPUT_DIR/assemblies/*/454PairStatus.txt
+	rm $OUTPUT_DIR/assemblies/*/454ReadStatus.txt
+	rm $OUTPUT_DIR/assemblies/*/454Scaffolds.qual
+	rm $OUTPUT_DIR/assemblies/*/454TrimStatus.txt
+	rm $OUTPUT_DIR/assemblies/*/idx_last.bck
+	rm $OUTPUT_DIR/assemblies/*/idx_last.des
+	rm $OUTPUT_DIR/assemblies/*/idx_last.prj
+	rm $OUTPUT_DIR/assemblies/*/idx_last.sds
+	rm $OUTPUT_DIR/assemblies/*/idx_last.ssp
+	rm $OUTPUT_DIR/assemblies/*/idx_last.suf
+	rm $OUTPUT_DIR/assemblies/*/idx_last.tis
+	rm $OUTPUT_DIR/assemblies/*/last_ali
+else 
+	d=`date`
+	echo "[$d] Temporary files are not deleted because errors occurs..."
+fi
+
+AFTER=`date +'%s'`
+ELAPSED=$(($AFTER-$BEFORE))
+d_tot=`date -u -d @$ELAPSED +"%T"`
+d=`date`
+echo "[$d] Total execution time with $NB_PROC core(s) : [$d_tot]"
