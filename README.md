@@ -34,7 +34,7 @@ PRE-REQUISITES
   - Binaries are provided for the following platform : Linux x86_64 (but some version like Ubuntu may not be compatible, see Troubleshooting)
   - Shell tool GNU Parallel ( http://www.gnu.org/software/parallel/ ) at least (22052015)
   - Perl 5.8.0 or higher installed.
-  - Perl graph library (http://search.cpan.org/~jhi/Graph-0.94/)
+  - Perl graph library (http://search.cpan.org/~jhi/Graph/)
   - Perl GetOpt module (http://search.cpan.org/dist/Getopt-Long/)
   - Perl Set::IntSpan module (http://search.cpan.org/~swmcd/Set-IntSpan-1.19/IntSpan.pm)
   - Newbler assembler v2.9 (available from 454 website)
@@ -45,10 +45,10 @@ DEPENDENCIES
 ------------
 The two following binaries : fastalength and fastacomposition
 come from the exonerate software availaible under the LGPL
-license. See http://www.ebi.ac.uk/~guy/exonerate/ for details.
+license. See http://www.ebi.ac.uk/~guy/exonerate for details.
 The two following binaries : compareads2 and extrac_reads come
 from the Compareads software available under the GPL license.
-See http://alcovna.genouest.org/compareads/ for details.
+See http://colibread.inria.fr/software/compareads/ for details.
 
 
 INSTALLATION
