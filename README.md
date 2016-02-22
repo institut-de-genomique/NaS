@@ -39,7 +39,7 @@ PRE-REQUISITES
   - Perl Set::IntSpan module (http://search.cpan.org/~swmcd/Set-IntSpan-1.19/IntSpan.pm)
   - Newbler assembler v2.9 (available from 454 website)
   - Blat binary (at least v35) accessible through your PATH environnment variable
-  - Last binary (at least 502) accessible through your PATH environnment variable
+  - Last binary (at least 588) accessible through your PATH environnment variable
 
 DEPENDENCIES
 ------------
