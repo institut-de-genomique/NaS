@@ -21,7 +21,7 @@ NaS is distributed open-source under CeCILL
 FREE SOFTWARE LICENSE. Check out http://www.cecill.info/
 for more information about the contents of this license.
 
-NaS home on the web is http://www.genoscope.cns.fr/nas 
+NaS home on the web is http://www.genoscope.cns.fr/nas
 
 NaS is also available on Docker Hub http://registry.hub.docker.com/u/rdbioseq/nas/
 
