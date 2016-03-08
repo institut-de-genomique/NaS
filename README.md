@@ -120,38 +120,39 @@ ACTCAAAGAACAAGAGTTACAGTCTAAAAAAGCTGCGGTTGC...
 ### Command to launch
 
 ```
-$(pwd)/NaS_v2/NaS --fq1 NaS_example_acineto/AWK_DOSF_1_1_A5KR6.IND3_clean.10prc.fastq --fq2 NaS_example_acineto/AWK_DOSF_1_2_A5KR6.IND3_clean.10prc.fastq --nano NaS_example_acineto/MinION_reads_Acinetobacter_baylyi.fa --out NaS_example --mode sentitive --nb_proc 5
+$(pwd)/NaS_v2/NaS --fq1 NaS_example_acineto/AWK_DOSF_1_1_A5KR6.IND3_clean.10prc.fastq --fq2 NaS_example_acineto/AWK_DOSF_1_2_A5KR6.IND3_clean.10prc.fastq --nano NaS_example_acineto/MinION_reads_Acinetobacter_baylyi.fa --out NaS_example --mode sensitive --nb_proc 5
 ```
 
 ### Result
-`Command : /env/cns/src/NaS/NaS_v5.0_evolution/NaS_wrapped --fq1 NaS_example_acineto/AWK_DOSF_1_1_A5KR6.IND3_clean.10prc.fastq --fq2 NaS_example_acineto/AWK_DOSF_1_2_A5KR6.IND3_clean.10prc.fastq --nano NaS_example_acineto/MinION_reads_Acinetobacter_baylyi.fa --out NaS_example --mode sensitive --nb_proc 5`
+```
+Command : /env/cns/src/NaS/NaS_v5.0_evolution/NaS_wrapped --fq1 NaS_example_acineto/AWK_DOSF_1_1_A5KR6.IND3_clean.10prc.fastq --fq2 NaS_example_acineto/AWK_DOSF_1_2_A5KR6.IND3_clean.10prc.fastq --nano NaS_example_acineto/MinION_reads_Acinetobacter_baylyi.fa --out NaS_example --mode sensitive --nb_proc 5
 
-`[jeu. août 13 15:46:24 CEST 2015] Create output directory : NaS_example`
+[jeu. août 13 15:46:24 CEST 2015] Create output directory : NaS_example
 
-`[jeu. août 13 15:46:24 CEST 2015] Create fasta file from fastq...`
+[jeu. août 13 15:46:24 CEST 2015] Create fasta file from fastq...
 
-`[jeu. août 13 15:47:22 CEST 2015] Alignement step in sensitive mode...`
+[jeu. août 13 15:47:22 CEST 2015] Alignement step in sensitive mode...
 
-`[jeu. août 13 15:48:37 CEST 2015] Convert maf file to psl file...`
+[jeu. août 13 15:48:37 CEST 2015] Convert maf file to psl file...
 
-`[jeu. août 13 15:48:48 CEST 2015] Select reads...`
+[jeu. août 13 15:48:48 CEST 2015] Select reads...
 
-`[jeu. août 13 15:48:48 CEST 2015] Retrieve similar reads...`
+[jeu. août 13 15:48:48 CEST 2015] Retrieve similar reads...
 
-`[jeu. août 13 15:51:13 CEST 2015] Generate NaS reads...`
+[jeu. août 13 15:51:13 CEST 2015] Generate NaS reads...
 
-`[jeu. août 13 15:51:26 CEST 2015] Untangle complex NaS reads...`
+[jeu. août 13 15:51:26 CEST 2015] Untangle complex NaS reads...
 
-`[jeu. août 13 15:51:27 CEST 2015] Generate statistics...`
+[jeu. août 13 15:51:27 CEST 2015] Generate statistics...
 
-`NbReads=  5  CumulativeSize=  31008  N50size=  7994  minSize=  2512  maxSize=  10464  avgSize=  6201.6  =>  NaS_example/NANO_reads.stats`
+NbReads=  5  CumulativeSize=  31008  N50size=  7994  minSize=  2512  maxSize=  10464  avgSize=  6201.6  =>  NaS_example/NANO_reads.stats
 
-`NbReads=  5  CumulativeSize=  37517  N50size=  9743  minSize=  1982  maxSize=  12787  avgSize=  7503.4  =>  NaS_example/NaS_hqctg_reads.stats`
+NbReads=  5  CumulativeSize=  37517  N50size=  9743  minSize=  1982  maxSize=  12787  avgSize=  7503.4  =>  NaS_example/NaS_hqctg_reads.stats
 
-`[jeu. août 13 15:51:27 CEST 2015] Delete temporary file...`
+[jeu. août 13 15:51:27 CEST 2015] Delete temporary file...
 
-`[jeu. août 13 15:51:30 CEST 2015] Total execution time with 5 core(s) : [00:05:06]`
-
+[jeu. août 13 15:51:30 CEST 2015] Total execution time with 5 core(s) : [00:05:06]
+```
 ### Troubleshooting
 #### Exonerate Binaries
 ```
