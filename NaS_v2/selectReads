@@ -56,7 +56,8 @@ our $MAXCOV = 200;
 our $WINDOW_SIZE = 1000;
 our $GAPCOV_THRESHOLD =5;
 my ($SILENT, $HELP) = (0, 0);
-my ($READS, $PSL, $PREFIX, $OUT, $NAME, $ILMN_R1, $ILMN_R2, $READSIZE) = ("", "", ".", "out.fastq", "", "", "",300);
+my ($READS, $PSL, $PREFIX, $OUT, $NAME, $ILMN_R1, $ILMN_R2, $READSIZE, $T, $K) = ("", "", ".", "out.fastq", "", "", "",300, 3, 32);
+
 
 my $result = &GetOptions("reads=s"  => \$READS,
 			 "r1=s"     => \$ILMN_R1,
@@ -67,6 +68,8 @@ my $result = &GetOptions("reads=s"  => \$READS,
 			 "name=s"   => \$NAME,
 			 "out=s"    => \$OUT,
 			 "silent"   => \$SILENT,
+			 "t=i"	    => \$T,        	#compareads t option
+			 "k=i"	    => \$K,        	#compareads k option
                          "h"        => \$HELP,
                         );
 
@@ -219,7 +222,7 @@ my %recruitreads = ();
 while(!$stop) {
     %recruitreads = ();
     system("mkdir -p $PREFIX/compareads_$cycle $PREFIX/tmp/seedreads_$cycle");
-    $nb_recruitreads = extractReads($seedreads, $PREFIX."/compareads_".$cycle, 3,
+    $nb_recruitreads = extractReads($seedreads, $PREFIX."/compareads_".$cycle, $T, $K,
 				    $ILMN_R1, $ILMN_R2, $NAME, \%recruitreads,\%goodreads);
     if($nb_recruitreads > $min_nb_reads) { $stop = 1;}
     if($cycle >= 5) { $stop = 1;}
@@ -240,9 +243,9 @@ system ("cat $PREFIX/tmp/aligned_reads/$NAME.fq >> $OUT");
 
 
 sub extractReads {
-    my($seedfile, $p, $t, $ilR1, $ilR2, $n, $recruitreads,$goodreads) = @_;
-    my $cmd_cprR1 = "$COMPAREADS -a $seedfile -b $ilR1 -o $p/$n.R1 -l $p/compareads_log/ -t $t 2>>$p/compareadsR1.stderr";
-    my $cmd_cprR2 = "$COMPAREADS -a $seedfile -b $ilR2 -o $p/$n.R2 -l $p/compareads_log/ -t $t 2>>$p/compareadsR2.stderr";
+    my($seedfile, $p, $t, $k, $ilR1, $ilR2, $n, $recruitreads,$goodreads) = @_;
+    my $cmd_cprR1 = "$COMPAREADS -a $seedfile -b $ilR1 -o $p/$n.R1 -l $p/compareads_log/ -t $t -k $k 2>>$p/compareadsR1.stderr";
+    my $cmd_cprR2 = "$COMPAREADS -a $seedfile -b $ilR2 -o $p/$n.R2 -l $p/compareads_log/ -t $t -k $k 2>>$p/compareadsR2.stderr";
     system($cmd_cprR1) == 0 or die "system $cmd_cprR1 failed: $?";
     system($cmd_cprR2) == 0 or die "system $cmd_cprR2 failed: $?";
 
@@ -323,6 +326,8 @@ $PRG_NAME - Retrieve reads similar to seeds reads previously found for one MiniI
 -name : name of the output file
 -out : output directory (out.fastq by default)
 -silent : silent mode (no argument)
+-t : number of substrings for compareads (default : 3)
+-k : size of kmer for compareads (default : 32)
 -h : usage
 ------------------------------------------------------------------------------------\n";
 
