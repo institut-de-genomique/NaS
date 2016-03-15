@@ -78,7 +78,7 @@ The directory "NaS_example_acineto" provides an example of a NaS run performed o
 Sequence name line should not contain slash
 - Illumina reads : NaS_example_acineto/AWK_DOSF_1_?_A5KR6.IND3_clean.10prc.fastq
 
-Warning : At the moment, we only supported the following fastq format :
+Warning : At the moment, we only support the following fastq format :
  - The sequence name line have to be a one field line
  - Sequence names have to end with '/1' (read1) and '/2' (read2)
 Example :
