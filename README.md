@@ -158,6 +158,10 @@ Unknown option: cat
 ```
 This error message appears when your version of parallel is too old. Update parallel to at least parallel22052015
 
+#### k option for Compareads
+
+The size of kmers selected must be between 21 and 38 (problems occurs for a smaller or greater size)
+
 ACKNOWLEDGMENTS
 ---------------
 
