@@ -58,7 +58,6 @@ function usage(){
     printf "\t--e	       : ONLY in sensitive mode : score threshold parameter of last, default is 120\n"
     printf "\t--t	       : number of substrings for compareads, default is 3\n"
     printf "\t--k	       : size of substrings for compareads, default is 32\n"
-    printf "\t--k_cookie       : size of substrings for cookiecutter, default is 100\n"
     printf "\t--untgl_seq_size : minimum size of sequence to run untangle (useful for RNA-Seq), default is 1000\n"
     printf "\t--nb_proc    : Number of parallel task, default is 1\n"
     printf "\t--rmtmp : yes or no : Delete temporary file, default is yes\n" 
