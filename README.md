@@ -115,7 +115,7 @@ ACTCAAAGAACAAGAGTTACAGTCTAAAAAAGCTGCGGTTGC...
 	
 	--t            : number of substrings for compareads, default is 3
 
-        --k            : size of substrings for compareads, default is 32
+	--k            : size of substrings for compareads, default is 32
 
 	--nb_proc    : Number of parallel task, default is 1
 	
