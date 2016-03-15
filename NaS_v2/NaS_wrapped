@@ -226,7 +226,7 @@ ls -S $OUTPUT_DIR/reads2/ | sed "s/.fastq//" | parallel --timeout 2000% -j $NB_P
 
 d=`date`
 echo "[$d] Untangle complex NaS reads..."
-ls -S $OUTPUT_DIR/reads2/ | sed "s/.fastq//" | parallel -j $NB_PROC "$UNTANGLE_GRAPH -newblerdir $OUTPUT_DIR/assemblies/{} -nano $OUTPUT_DIR/assemblies/{}/{}.fa -minsize $UNTGL_SEQ_SIZE -name {} 2>$OUTPUT_DIR/assemblies/{}/stderr_untangle2"
+ls -S $OUTPUT_DIR/reads2/ | sed "s/.fastq//" | parallel -j $NB_PROC "$UNTANGLE_GRAPH -newblerdir $OUTPUT_DIR/assemblies/{} -nano $OUTPUT_DIR/assemblies/{}/{}.fa -name {} 2>$OUTPUT_DIR/assemblies/{}/stderr_untangle2"
 cat $OUTPUT_DIR/assemblies/*/NaS_hqctg_reads_final.fa | FastaToTbl | perl -ne '@f=split; $f[1]=~/^([actgn]*)([ACTGN]+[ACTGNactgn]*[ACTGN]+)([actgn]*)$/; if (length ($2)>0){print $f[0], " ", $2, "\n";}' | TblToFasta | sed "s=_contig[0-9]*\$==" > $OUTPUT_DIR/NaS_hqctg_reads.fa
 
 d=`date`
