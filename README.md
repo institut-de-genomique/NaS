@@ -83,8 +83,9 @@ Sequence name line should not contain slash
 Warning : At the moment, we only support the following fastq format :
  - The sequence name line have to be a one field line
  - Sequence names have to end with '/1' (read1) and '/2' (read2)
-```
+ - 
 Example :
+```
 @M2:A5KR6:1:1101:9590:1008/1
 ACTCAAAGAACAAGAGTTACAGTCTAAAAAAGCTGCGGTTGC...
 +
