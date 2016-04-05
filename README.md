@@ -98,31 +98,18 @@ ACTCAAAGAACAAGAGTTACAGTCTAAAAAAGCTGCGGTTGC...
 ### Options
 
 	--fq1        : illumina reads (R1) in fastQ format
-	
 	--fq2        : illumina reads (R2) in fastQ format
-	
 	--nano       : nanopore long reads in fastA format
-	
 	--out        : Output directory, default is NaS_date_pid
-	
-	--mode    : mode : fast or sensitive. fast mode use blat as aligner whereas sensitive mode use last, default is fast
-	
+	--mode       : mode : fast or sensitive. fast mode use blat as aligner whereas sensitive mode use last, default is fast
 	--tile       : ONLY in fast mode : tile size parameter of blat, default is 10
-	
 	--step       : ONLY in fast mode : step size parameter of blat, default is 5
-	
-	--a	       : ONLY in sensitive mode : gap existence cost parameter of last, default is 1
-	
-	--b	       : ONLY in sensitive mode : gap extension cost parameter of last, default is 1
-	
-	--e	       : ONLY in sensitive mode : score threshold parameter of last, default is 40
-	
-	--t            : number of substrings for compareads, default is 3
-
-        --k            : size of substrings for compareads, default is 32
-
+	--a	     : ONLY in sensitive mode : gap existence cost parameter of last, default is 1
+	--b	     : ONLY in sensitive mode : gap extension cost parameter of last, default is 1
+	--e	     : ONLY in sensitive mode : score threshold parameter of last, default is 40
+	--t          : number of substrings for compareads, default is 3
+        --k          : size of substrings for compareads, default is 32
 	--nb_proc    : Number of parallel task, default is 1
-	
 	-h           : help message
 	
 ### Command to launch
