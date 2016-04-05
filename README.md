@@ -17,6 +17,8 @@ Finally, a microassembly of the reads is performed, instead of
 a classical polishing of the consensus, using an overlap-layout-consensus
 strategy, and repeats are resolved by a graph traversal algorithm.
 
+At the moment NaS should only be used on genomes smaller than 30 Mb, to avoid long running times.
+
 NaS is distributed open-source under CeCILL 
 FREE SOFTWARE LICENSE. Check out http://www.cecill.info/
 for more information about the contents of this license.
