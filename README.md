@@ -104,9 +104,9 @@ ACTCAAAGAACAAGAGTTACAGTCTAAAAAAGCTGCGGTTGC...
 	--mode       : mode : fast or sensitive. fast mode use blat as aligner whereas sensitive mode use last, default is fast
 	--tile       : ONLY in fast mode : tile size parameter of blat, default is 10
 	--step       : ONLY in fast mode : step size parameter of blat, default is 5
-	--a	     : ONLY in sensitive mode : gap existence cost parameter of last, default is 1
-	--b	     : ONLY in sensitive mode : gap extension cost parameter of last, default is 1
-	--e	     : ONLY in sensitive mode : score threshold parameter of last, default is 40
+	--a          : ONLY in sensitive mode : gap existence cost parameter of last, default is 1
+	--b          : ONLY in sensitive mode : gap extension cost parameter of last, default is 1
+	--e          : ONLY in sensitive mode : score threshold parameter of last, default is 40
 	--t          : number of substrings for compareads, default is 3
         --k          : size of substrings for compareads, default is 32
 	--nb_proc    : Number of parallel task, default is 1
