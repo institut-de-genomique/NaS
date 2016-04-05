@@ -170,4 +170,4 @@ Institut de Genomique, CEA and Agence Nationale de la
 Recherche (ANR), and France Génomique (ANR-10-INBS-09-08).
 
 ### NaS's developers
-Jean-Marc Aury, Amin Madoui, Stefan Engelen and Guillaume Gautreau 
+Jean-Marc Aury, Amin Madoui, Stefan Engelen, Guillaume Gautreau, François-Xavier Babin and Benjamin Istace 
