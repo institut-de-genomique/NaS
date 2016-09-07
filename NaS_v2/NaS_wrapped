@@ -184,6 +184,32 @@ while :; do
     esac
 done
 
+# check requirements
+NaS_needed_commands="parallel lastal blat runAssembly exonerate" ;
+checkrequirements () {
+        command -v command >/dev/null 2>&1 || {
+                echo "WARNING> \"command\" not found. Check requirements skipped !"
+                return 1 ;
+        }
+        for requirement in ${NaS_needed_commands} ; do
+                echo -n "checking for \"$requirement\" ... " ;
+                command -v ${requirement} > /dev/null && {
+                        echo "ok" ;
+                        continue ;
+                } || {
+                        echo "required but not found !" ;
+                        _return=1 ;
+                }
+                done
+        [ -z "${_return}" ] || {
+                echo "ERR > Requirement missing." >&2 ;
+                exit 1 ;
+        }
+}
+
+checkrequirements 
+#
+
 BEFORE=`date +'%s'`
 
 d=`date`
